@@ -13,6 +13,9 @@ inputs:
     required: true
     default: '7.2'
   database-adapter:
+    description: 'default PDO "PDO_MYSQL","MYSQLI"'
+    required: false
+    default: 'PDO_MYSQL'
   node-version:
     description: 'node version default 12'
     required: false
@@ -32,8 +35,8 @@ runs:
     - name: Move File to right place
       shell: bash
       run: |
-          mkdir /home/runner/work/matomo
-          mv ./matomo /home/runner/work/matomo/
+        mkdir /home/runner/work/matomo
+        mv ./matomo /home/runner/work/matomo/
 
     - name: Setup PHP
       uses: shivammathur/setup-php@v2
