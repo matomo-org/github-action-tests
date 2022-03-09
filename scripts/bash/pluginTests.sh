@@ -11,13 +11,13 @@ then
         echo -e "${GREEN}[ plugin name = $PLUGIN_NAME ]${SET}"
     fi
 
-    if [ "$TEST_SUITE" = "AngularJSTests" ]
+    if [ "$TEST_SUITE" = "Angular" ]
     then
      echo -e "${GREEN}Running angularjs tests${SET}"
      ./node_modules/karma/bin/karma start karma.conf.js --browsers ChromeHeadless --single-run
      echo -e "${GREEN}Running vue tests${SET}"
      npm test
-    elif [ "$TEST_SUITE" = "JavascriptTests" ]
+    elif [ "$TEST_SUITE" = "JS" ]
     then
       ./console tests:run-js --matomo-url='http://localhost'
     elif [ "$TEST_SUITE" = "UI" ]
@@ -28,7 +28,7 @@ then
         else
             ./console tests:run-ui --store-in-ui-tests-repo --persist-fixture-data --assume-artifacts --core --extra-options="$UITEST_EXTRA_OPTIONS"
         fi
-    elif [ "$TEST_SUITE" = "AllTests" ]
+    elif [ "$TEST_SUITE" = "All" ]
     then
         exit_code=0
 
@@ -52,7 +52,7 @@ then
     else
         if [ -n "$PLUGIN_NAME" ]
         then
-            ./vendor/phpunit/phpunit/phpunit --configuration ./tests/PHPUnit/phpunit.xml --colors --testsuite $TEST_SUITE --group $PLUGIN_NAME --coverage-clover $PIWIK_ROOT_DIR/build/logs/clover-$PLUGIN_NAME.xml $PHPUNIT_EXTRA_OPTIONS | tee phpunit.out
+            ./vendor/phpunit/phpunit/phpunit --configuration ./tests/PHPUnit/phpunit.xml --colors --testsuite $TEST_SUITE --group $PLUGIN_NAME $PHPUNIT_EXTRA_OPTIONS | tee phpunit.out
         else
             ./vendor/phpunit/phpunit/phpunit --configuration ./tests/PHPUnit/phpunit.xml --testsuite $TEST_SUITE --colors $PHPUNIT_EXTRA_OPTIONS | tee phpunit.out
         fi

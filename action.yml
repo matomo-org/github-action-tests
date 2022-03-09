@@ -1,77 +1,231 @@
 name: 'Matomo Tests'
 description: 'Running Matomo Tests'
 inputs:
-  is-plugin: # id of input
-    description: 'is plugin or core'
-    required: true
-    default: false
   test-type:
-    description: '"UnitTests","SystemTestsPlugins","SystemTestsCore" ,"IntegrationTestsCore","IntegrationTestsPlugins","JS","UI"'
+    type: choice
+    description: "test type"
     required: true
+    options:
+      - UI
+      - PHP
+      - PluginTests
+      - JS
+      - Angular
+      - All
+    default: PHP
+  git-ref:
+    description: "ref"
+    required: true
+  run-id:
+    description: "GitHub Run Id"
+    required: false
+  repository:
+    description: "GitHub repository"
+    required: false
+  run-number:
+    description: "GitHub run number"
+    required: false
+  artifact-pass:
+    description: "UI upload pass"
+    required: false
+  plugin-name:
+    description: "name"
+    required: false
+  mysql-driver:
+    description: "Mysql driver"
+    required: false
+    options:
+      - PDO_MYSQL
+      - MYSQLI
+    default: 'PDO_MYSQL'
+  test-command:
+    description: "Test name to run the tests"
+    options:
+      - UnitTests
+      - SystemTestsPlugins
+      - SystemTestsCore
+      - IntegrationTestsCore
+      - IntegrationTestsPlugins
+    required: false
   php-version:
     description: '7.2-8.1'
     required: true
-    default: '7.2'
-  database-adapter:
+    default: ''
   node-version:
     description: 'node version default 12'
     required: false
-    default: '12'
+    default: ''
+  addition:
+    description: 'additional test or setup'
+    required: false
+    default: ''
+  php-memory:
+    description: "php memory limit"
+    required: false
+    default: "256M"
+  redis-service:
+    type: choice
+    description: "require reds services"
+    required: false
+    options:
+      - true
+      - false
+    default: false
+  mysql-service:
+    type: choice
+    description: "require mysql services"
+    required: false
+    options:
+      - true
+      - false
+    default: true
+  workspace:
+    required: false
+    description: "when the repo is private repo different from plugin name"
+
 
 runs:
   using: "composite"
   steps:
-    - name: Checkout code
-      uses: actions/checkout@v2
-      with:
-        repository: matomo-org/matomo
-        lfs: false
-        submodules: recursive
-        path: ./matomo
-
-    - name: Move File to right place
+    - name: start mysql services
+      if: inputs.mysql-service == 'true'
       shell: bash
       run: |
-          mkdir /home/runner/work/matomo
-          mv ./matomo /home/runner/work/matomo/
+        docker run -d  --tmpfs /var/lib/mysql:rw --tmpfs /bitnami/mysql/data:rw --name mysql -p 3306:3306 -e ALLOW_EMPTY_PASSWORD=yes -e MYSQL_DATABASE=matomo_tests bitnami/mysql:5.7
 
+    - name: start redis serivces
+      if: inputs.redis-service == 'true'
+      shell: bash
+      run: |
+        docker run -d --name redis -e ALLOW_EMPTY_PASSWORD=yes -p 6379:6379 bitnami/redis:latest
+        docker run -d --name redis-sentinel -p 26379:26379 bitnami/redis-sentinel:latest
+
+    - name: Checkout code
+      shell: bash
+      run: |
+        git config --global advice.detachedHead false
+        cd /home/runner/work/
+        git clone https://github.com/matomo-org/github-action-tests.git appendix
+        cd appendix
+        git checkout v1
+
+      # setup php
     - name: Setup PHP
+      if: inputs.php-version != ''
       uses: shivammathur/setup-php@v2
       with:
-        php-version: ${{ matrix.php }}
-        extensions: bcmath, ldap, curl, zip, pdo_mysql, mysqli, gd, redis
+        php-version: ${{ inputs.php-version }}
+        extensions: bcmath, ldap, curl, zip, pdo_mysql, mysqli, gd, redis, zlib, opcache
         ini-values: |
-          memory_limit = 256M,
+          post_max_size=256M
+          memory_limit=${{ inputs.php-memory}},
           max_execution_time=10000,
           always_populate_raw_post_data=-1,
           error_reporting=E_ALL,
-          log_errors=on, display_errors=on,
-          allow_url_fopen = on,
-          zend.exception_ignore_args = Off
-          mysqli.allow_local_infile = On
+          log_errors=on,
+          display_errors=on,
+          allow_url_fopen=on,
+          zend.exception_ignore_args=Off
+          mysqli.allow_local_infile=On
+          opcache.enable_cli=1
         tools: composer:v2
         coverage: none
 
+      # if required node setup node
     - name: Setup Node
-      if: ${{ inputs.test-type }} == 'UI' ||  ${{ inputs.test-type }} == 'JS'
+      if: inputs.node-version != ''
       uses: actions/setup-node@v2
       with:
         node-version: ${{ inputs.node-version }}
 
+      # setup apache etc
     - name: prepare setup
       shell: bash
-      run: ./scripts/bash/prepare.sh
+      run: /home/runner/work/appendix/scripts/bash/prepare.sh
       env:
         PHP_VERSION: ${{ inputs.php-version }}
         MATOMO_TEST_TARGET: ${{ inputs.test-type }}
-        MYSQL_ADAPTER: ${{ inputs.database-adapter }}
+        MYSQL_ADAPTER: ${{ inputs.mysql-driver }}
+        ADDITION: ${{ inputs.addition }}
+        PLUGIN_NAME: ${{ inputs.plugin-name }}
+        COMMAND: ${{ inputs.test-command }}
+        REF: ${{ inputs.git-ref }}
+        WORKSPACE: ${{ inputs.workspace }}
 
+      # setting up plugin tests
     - name: PluginTests Test runing
-      if: ${{ inputs.is-plugin }}
+      if: inputs.plugin-name != ''
+      working-directory: /home/runner/work/matomo/matomo
       shell: bash
-      run: ./scripts/bash/plugins/pluginTests.sh
+      run: /home/runner/work/appendix/scripts/bash/pluginTests.sh
       env:
-        TEST_SUITE: ${{ matrix.type }}
-        PLUGIN_NAME: ${{ env.PLUGIN }}
+        TEST_SUITE: ${{ inputs.test-type }}
+        PLUGIN_NAME: ${{ inputs.plugin-name }}
 
+      # running main tests
+    - name: Test PHP running
+      if: inputs.plugin-name == '' && inputs.test-type == 'PHP'
+      working-directory: /home/runner/work/matomo/matomo
+      shell: bash
+      run: |
+        ./vendor/phpunit/phpunit/phpunit --configuration ./tests/PHPUnit/phpunit.xml --testsuite ${{ inputs.test-command }}
+      env:
+        TRAVIS: true
+        GITHUB: true
+        PHP_VERSION: ${{ inputs.php-version }}
+        MYSQL_ADAPTER: ${{ inputs.mysql-driver }}
 
+    - name: Test JS running
+      if: inputs.plugin-name == '' && inputs.test-type == 'JS'
+      working-directory: /home/runner/work/matomo/matomo
+      shell: bash
+      run: |
+        ./console tests:run-js --matomo-url='http://localhost'
+      env:
+        TRAVIS: true
+        GITHUB: true
+        PHP_VERSION: ${{ inputs.php-version }}
+        MYSQL_ADAPTER: ${{ inputs.mysql-driver }}
+
+    - name: Test Angular running
+      if: inputs.plugin-name == '' && inputs.test-type == 'Angular'
+      working-directory: /home/runner/work/matomo/matomo
+      shell: bash
+      run: |
+        cd /home/runner/work/matomo/matomo/tests/angularjs
+        npm install
+        ./node_modules/karma/bin/karma start karma.conf.js --browsers ChromeHeadless --single-run
+      env:
+        TRAVIS: true
+        GITHUB: true
+
+    - name: Test UI running
+      if: inputs.plugin-name == '' && inputs.test-type == 'UI'
+      working-directory: /home/runner/work/matomo/matomo
+      shell: bash
+      run: |
+        ./console tests:run-ui --store-in-ui-tests-repo --persist-fixture-data --assume-artifacts --core --extra-options="--num-test-groups=8 --test-group=${{ inputs.test-command }}"
+      env:
+        TRAVIS: true
+        GITHUB: true
+      # system checks failed, upload expected xml and PDF
+
+    - name: upload processed screenshots
+      if: failure() && (inputs.test-type == 'UI' || inputs.test-type == 'All' || inputs.test-type == 'PluginTests')
+      shell: bash
+      run: /home/runner/work/appendix/scripts/bash/upload_artifacts.sh
+      env:
+        ARTIFACTS_PASS: ${{ inputs.artifect-pass }}
+        GITHUB_REPO: ${{ inputs.repository }}
+        GITHUB_BRANCH: ${{ inputs.merge-target }}
+        GITHUB_RUN_ID: ${{ inputs.run-id }}
+        GITHUB_RUN_NUMBER: ${{ inputs.run-number }}
+
+    - name: View UI failures
+      if: failure() && (inputs.test-type == 'UI' || inputs.test-type == 'All' || inputs.test-type == 'PluginTests')
+      shell: bash
+      run: /home/runner/work/appendix/scripts/bash/view_ui_failed.sh
+      env:
+        GITHUB_REPO: ${{ inputs.repository }}
+        GITHUB_BRANCH: ${{ inputs.merge-target }}
+        GITHUB_RUN_ID: ${{ inputs.run-id }}
