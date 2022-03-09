@@ -1,0 +1,77 @@
+name: 'Matomo Tests'
+description: 'Running Matomo Tests'
+inputs:
+  is-plugin: # id of input
+    description: 'is plugin or core'
+    required: true
+    default: false
+  test-type:
+    description: '"UnitTests","SystemTestsPlugins","SystemTestsCore" ,"IntegrationTestsCore","IntegrationTestsPlugins","JS","UI"'
+    required: true
+  php-version:
+    description: '7.2-8.1'
+    required: true
+    default: '7.2'
+  database-adapter:
+  node-version:
+    description: 'node version default 12'
+    required: false
+    default: '12'
+
+runs:
+  using: "composite"
+  steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+      with:
+        repository: matomo-org/matomo
+        lfs: false
+        submodules: recursive
+        path: ./matomo
+
+    - name: Move File to right place
+      shell: bash
+      run: |
+          mkdir /home/runner/work/matomo
+          mv ./matomo /home/runner/work/matomo/
+
+    - name: Setup PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: ${{ matrix.php }}
+        extensions: bcmath, ldap, curl, zip, pdo_mysql, mysqli, gd, redis
+        ini-values: |
+          memory_limit = 256M,
+          max_execution_time=10000,
+          always_populate_raw_post_data=-1,
+          error_reporting=E_ALL,
+          log_errors=on, display_errors=on,
+          allow_url_fopen = on,
+          zend.exception_ignore_args = Off
+          mysqli.allow_local_infile = On
+        tools: composer:v2
+        coverage: none
+
+    - name: Setup Node
+      if: ${{ inputs.test-type }} == 'UI' ||  ${{ inputs.test-type }} == 'JS'
+      uses: actions/setup-node@v2
+      with:
+        node-version: ${{ inputs.node-version }}
+
+    - name: prepare setup
+      shell: bash
+      run: ./scripts/bash/prepare.sh
+      env:
+        PHP_VERSION: ${{ inputs.php-version }}
+        MATOMO_TEST_TARGET: ${{ inputs.test-type }}
+        MYSQL_ADAPTER: ${{ inputs.database-adapter }}
+
+    - name: PluginTests Test runing
+      if: ${{ inputs.is-plugin }}
+      shell: bash
+      run: ./scripts/bash/plugins/pluginTests.sh
+      env:
+        TEST_SUITE: ${{ matrix.type }}
+        PLUGIN_NAME: ${{ env.PLUGIN }}
+
+
