@@ -15,7 +15,7 @@ inputs:
   php-extensions:
     description: 'php extensions used',
     required: false
-    default: "bcmath, ldap, curl, zip, pdo_mysql, mysqli, gd, redis"
+    default: bcmath, ldap, curl, zip, pdo_mysql, mysqli, gd, redis
   database-adapter:
     description: 'PDO_MYSQL or MYSQLI'
     required: false
