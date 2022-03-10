@@ -4,9 +4,9 @@ inputs:
   is-plugin: # id of input
     description: 'is plugin or core'
     required: true
-    default: false
+    default: '0'
   test-type:
-    description: '"UnitTests","SystemTestsPlugins","SystemTestsCore","IntegrationTestsCore","IntegrationTestsPlugins","UI"'
+    description: 'test type'
     required: true
   php-version:
     description: '7.2-8.1'
@@ -28,7 +28,7 @@ runs:
   using: "composite"
   steps:
     - name: Checkout code Plugin
-      if: ${{ inputs.is-plugin }}
+      if: ${{ inputs.is-plugin }} == '1'
       uses: actions/checkout@v2
       with:
         repository: matomo-org/matomo
@@ -37,14 +37,14 @@ runs:
         path: ./matomo
 
     - name: Move File to right place
-      if: ${{ inputs.is-plugin }}
+      if: ${{ inputs.is-plugin }} == '1'
       shell: bash
       run: |
         mkdir /home/runner/work/matomo
         mv ./matomo /home/runner/work/matomo/
 
     - name: Checkout code
-      if: ${{ inputs.is-plugin }} == false
+      if: ${{ inputs.is-plugin }} == '0'
       uses: actions/checkout@v2
       with:
         lfs: ${{ inputs.test-type }}=='UI'?true:false
@@ -83,7 +83,7 @@ runs:
 
 
     - name: PluginTests ${{ inputs.test-type }} Test is runing
-      if: ${{ inputs.is-plugin }}
+      if: ${{ inputs.is-plugin }} == '1'
       shell: bash
       run: ./scripts/bash/plugins/pluginTests.sh
       env:
@@ -91,7 +91,7 @@ runs:
         PLUGIN_NAME: ${{ env.PLUGIN }}
 
     - name: ${{ inputs.test-type }} Test is running
-      if: ${{ inputs.is-plugin }} == false && ${{ inputs.test-type }} != 'UI' &&  ${{ inputs.test-type }} != 'JS'
+      if: ${{ inputs.is-plugin }} == '0' && ${{ inputs.test-type }} != 'UI' &&  ${{ inputs.test-type }} != 'JS'
       shell: bash
       run: |
         ./vendor/phpunit/phpunit/phpunit --configuration ./tests/PHPUnit/phpunit.xml --testsuite ${{ inputs.test-type }}
