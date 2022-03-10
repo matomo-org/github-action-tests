@@ -6,12 +6,16 @@ inputs:
     required: true
     default: false
   test-type:
-    description: '"UnitTests","SystemTestsPlugins","SystemTestsCore" ,"IntegrationTestsCore","IntegrationTestsPlugins","JS","UI"'
+    description: '"UnitTests","SystemTestsPlugins","SystemTestsCore","IntegrationTestsCore","IntegrationTestsPlugins","UI"'
     required: true
   php-version:
     description: '7.2-8.1'
     required: true
     default: '7.2'
+  php-extensions:
+    description: 'bcmath, ldap, curl, zip, pdo_mysql, mysqli, gd, redis',
+    required: false
+    default: 'bcmath, ldap, curl, zip, pdo_mysql, mysqli, gd, redis'
   database-adapter:
     description: 'default PDO "PDO_MYSQL","MYSQLI"'
     required: false
@@ -24,7 +28,8 @@ inputs:
 runs:
   using: "composite"
   steps:
-    - name: Checkout code
+    - name: Checkout code Plugin
+      if: ${{ inputs.is-plugin }}
       uses: actions/checkout@v2
       with:
         repository: matomo-org/matomo
@@ -33,16 +38,24 @@ runs:
         path: ./matomo
 
     - name: Move File to right place
+      if: ${{ inputs.is-plugin }}
       shell: bash
       run: |
         mkdir /home/runner/work/matomo
         mv ./matomo /home/runner/work/matomo/
 
+    - name: Checkout code
+      if: ${{ inputs.is-plugin }} == false
+      uses: actions/checkout@v2
+      with:
+        lfs: ${{ inputs.test-type }}=='UI'?true:false
+        submodules: recursive
+
     - name: Setup PHP
       uses: shivammathur/setup-php@v2
       with:
-        php-version: ${{ matrix.php }}
-        extensions: bcmath, ldap, curl, zip, pdo_mysql, mysqli, gd, redis
+        php-version: ${{ inputs.php-version }}
+        extensions: ${{ inputs.php-extensions }}
         ini-values: |
           memory_limit = 256M,
           max_execution_time=10000,
@@ -69,7 +82,7 @@ runs:
         MATOMO_TEST_TARGET: ${{ inputs.test-type }}
         MYSQL_ADAPTER: ${{ inputs.database-adapter }}
 
-    - name: PluginTests Test runing
+    - name: PluginTests ${{ input.test-type }} Test is runing
       if: ${{ inputs.is-plugin }}
       shell: bash
       run: ./scripts/bash/plugins/pluginTests.sh
@@ -77,4 +90,39 @@ runs:
         TEST_SUITE: ${{ matrix.type }}
         PLUGIN_NAME: ${{ env.PLUGIN }}
 
+    - name: ${{ input.test-type }} Test is running
+      if: ${{ inputs.is-plugin }} == false && ${{ inputs.test-type }} != 'UI' &&  ${{ inputs.test-type }} != 'JS'
+      run: |
+        ./vendor/phpunit/phpunit/phpunit --configuration ./tests/PHPUnit/phpunit.xml --testsuite ${{ input.test-type }}
+      env:
+        TRAVIS: true
+        GITHUB: true
+        PHP_VERSION: ${{ inputs.php-version }}
+        MYSQL_ADAPTER: ${{ inputs.database-adapter }}
 
+    - name: UI tests Group ${{ matrix.parts }}
+      if:  ${{ inputs.is-plugin }} == 'UI'
+      env:
+        GITHUB: true
+      run: |
+        ./console tests:run-ui --store-in-ui-tests-repo --persist-fixture-data --assume-artifacts --core --extra-options="--num-test-groups=8 --test-group=${{ matrix.parts }}"
+
+    - name: upload processed screenshots
+      if: failure() && ${{ inputs.is-plugin }} == 'UI'
+      shell: bash
+      run: ./scripts/bash/upload_artifacts.sh
+      env:
+        ARTIFACTS_PASS: ${{ secrets.ARTIFACTS_PASS }}
+        GITHUB_REPO: ${{ github.repository }}
+        GITHUB_BRANCH: ${{ github.event.pull_request.base.ref }}
+        GITHUB_RUN_ID: ${{ github.run_id }}
+        GITHUB_RUN_NUMBER: ${{ github.run_number }}
+
+    - name: View UI failures
+      if: failure() && ${{ inputs.is-plugin }} == 'UI'
+      shell: bash
+      run: ./scripts/bash/view_ui_failed.sh
+      env:
+          GITHUB_REPO: ${{ github.repository }}
+          GITHUB_BRANCH: ${{ github.event.pull_request.base.ref }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
