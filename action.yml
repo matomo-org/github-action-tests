@@ -1,10 +1,6 @@
-name: 'Matomo Tests'
+name: 'Matomo Main Tests'
 description: 'Running Matomo Tests'
 inputs:
-  is-plugin: # id of input
-    description: 'is plugin or core'
-    required: true
-    default: '0'
   test-type:
     description: 'test type'
     required: true
@@ -27,27 +23,10 @@ inputs:
 runs:
   using: "composite"
   steps:
-    - name: Checkout code Plugin
-      if: ${{ inputs.is-plugin }} == '1'
-      uses: actions/checkout@v2
-      with:
-        repository: matomo-org/matomo
-        lfs: false
-        submodules: recursive
-        path: ./matomo
-
-    - name: Move File to right place
-      if: ${{ inputs.is-plugin }} == '1'
-      shell: bash
-      run: |
-        mkdir /home/runner/work/matomo
-        mv ./matomo /home/runner/work/matomo/
-
     - name: Checkout code
-      if: ${{ inputs.is-plugin }} == '0'
       uses: actions/checkout@v2
       with:
-        lfs: ${{ inputs.test-type }}=='UI'?true:false
+        lfs: false
         submodules: recursive
 
     - name: Setup PHP
@@ -67,12 +46,6 @@ runs:
         tools: composer:v2
         coverage: none
 
-    - name: Setup Node
-      if: ${{ inputs.test-type }} == 'UI' ||  ${{ inputs.test-type }} == 'JS'
-      uses: actions/setup-node@v2
-      with:
-        node-version: ${{ inputs.node-version }}
-
     - name: prepare setup
       shell: bash
       run: ./scripts/bash/prepare.sh
@@ -81,17 +54,7 @@ runs:
         MATOMO_TEST_TARGET: ${{ inputs.test-type }}
         MYSQL_ADAPTER: ${{ inputs.database-adapter }}
 
-
-    - name: PluginTests ${{ inputs.test-type }} Test is runing
-      if: ${{ inputs.is-plugin }} == '1'
-      shell: bash
-      run: ./scripts/bash/plugins/pluginTests.sh
-      env:
-        TEST_SUITE: ${{ matrix.type }}
-        PLUGIN_NAME: ${{ env.PLUGIN }}
-
     - name: ${{ inputs.test-type }} Test is running
-      if: ${{ inputs.is-plugin }} == '0' && ${{ inputs.test-type }} != 'UI' &&  ${{ inputs.test-type }} != 'JS'
       shell: bash
       run: |
         ./vendor/phpunit/phpunit/phpunit --configuration ./tests/PHPUnit/phpunit.xml --testsuite ${{ inputs.test-type }}
@@ -100,31 +63,3 @@ runs:
         GITHUB: true
         PHP_VERSION: ${{ inputs.php-version }}
         MYSQL_ADAPTER: ${{ inputs.database-adapter }}
-
-    - name: UI tests Group ${{ matrix.parts }}
-      if:  ${{ inputs.is-plugin }} == 'UI'
-      shell: bash
-      env:
-        GITHUB: true
-      run: |
-        ./console tests:run-ui --store-in-ui-tests-repo --persist-fixture-data --assume-artifacts --core --extra-options="--num-test-groups=8 --test-group=${{ matrix.parts }}"
-
-    - name: upload processed screenshots
-      if: failure() && ${{ inputs.is-plugin }} == 'UI'
-      shell: bash
-      run: ./scripts/bash/upload_artifacts.sh
-      env:
-        ARTIFACTS_PASS: ${{ inputs.secrets }}
-        GITHUB_REPO: ${{ github.repository }}
-        GITHUB_BRANCH: ${{ github.event.pull_request.base.ref }}
-        GITHUB_RUN_ID: ${{ github.run_id }}
-        GITHUB_RUN_NUMBER: ${{ github.run_number }}
-
-    - name: View UI failures
-      if: failure() && ${{ inputs.is-plugin }} == 'UI'
-      shell: bash
-      run: ./scripts/bash/view_ui_failed.sh
-      env:
-          GITHUB_REPO: ${{ github.repository }}
-          GITHUB_BRANCH: ${{ github.event.pull_request.base.ref }}
-          GITHUB_RUN_ID: ${{ github.run_id }}
