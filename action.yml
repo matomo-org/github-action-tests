@@ -1,6 +1,12 @@
 name: 'Matomo Plugin Tests'
 description: 'Running Matomo Tests'
 inputs:
+  git-head:
+    description: "head"
+    required: true
+  git-sha:
+    description: "sha"
+    required: true
   plugin-name:
     description: "name"
     required: true
@@ -44,8 +50,8 @@ runs:
       working-directory: /home/runner/work/matomo/matomo
       run: |
         cd plugins/${{ inputs.plugin-name }}
-        git pull origin ${{ github.head_ref }}
-        git checkout ${{ github.event.pull_request.head.sha }}
+        git pull origin ${{ inputs.git-head }}
+        git checkout ${{ inputs.git-sha }}
 
     - name: Setup PHP
       uses: shivammathur/setup-php@v2
