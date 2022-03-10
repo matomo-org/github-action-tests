@@ -50,7 +50,7 @@ runs:
       shell: bash
       run: |
         mkdir /home/runner/work/appendix
-        mv ./appendix /home/runner/work/appendix
+        mv ./appendix/appendix /home/runner/work/appendix
         mkdir /home/runner/work/matomo
         mv ./matomo /home/runner/work/matomo/
         ls -l /home/runner/work/appendix
