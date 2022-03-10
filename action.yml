@@ -34,11 +34,13 @@ runs:
         submodules: recursive
         path: ./matomo
     - name: Move File to right place
+      shell: bash
       run: |
         mkdir /home/runner/work/matomo
         mv ./matomo /home/runner/work/matomo/
 
     - name: Checkout Submodule to current Pull request
+      shell: bash
       working-directory: /home/runner/work/matomo/matomo
       run: |
         cd plugins/${{ inputs.plugin-name }}
@@ -65,8 +67,8 @@ runs:
     - name: Setup Node
       if: ${{ inputs.test-type }} == 'UI'
       uses: actions/setup-node@v2
-        with:
-          node-version: ${{ inputs.node-version }}
+      with:
+        node-version: ${{ inputs.node-version }}
 
     - name: prepare setup
       shell: bash
@@ -77,9 +79,9 @@ runs:
         MYSQL_ADAPTER: ${{ inputs.database-adapter }}
 
     - name: PluginTests Test runing
-        working-directory: /home/runner/work/matomo/matomo
-        shell: bash
-        run: ./scripts/bash/plugins/pluginTests.sh
-        env:
-          TEST_SUITE: ${{ inputs.test-type }}
-          PLUGIN_NAME: ${{ inputs.plugin-name }}
+      working-directory: /home/runner/work/matomo/matomo
+      shell: bash
+      run: ./scripts/bash/plugins/pluginTests.sh
+      env:
+        TEST_SUITE: ${{ inputs.test-type }}
+        PLUGIN_NAME: ${{ inputs.plugin-name }}
