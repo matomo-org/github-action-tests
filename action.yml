@@ -20,6 +20,9 @@ inputs:
     description: 'node version default 12'
     required: false
     default: '12'
+  secrets:
+    description: ''
+    required: false
 
 runs:
   using: "composite"
@@ -78,7 +81,8 @@ runs:
         MATOMO_TEST_TARGET: ${{ inputs.test-type }}
         MYSQL_ADAPTER: ${{ inputs.database-adapter }}
 
-    - name: PluginTests ${{ input.test-type }} Test is runing
+
+    - name: PluginTests ${{ inputs.test-type }} Test is runing
       if: ${{ inputs.is-plugin }}
       shell: bash
       run: ./scripts/bash/plugins/pluginTests.sh
@@ -86,10 +90,11 @@ runs:
         TEST_SUITE: ${{ matrix.type }}
         PLUGIN_NAME: ${{ env.PLUGIN }}
 
-    - name: ${{ input.test-type }} Test is running
+    - name: ${{ inputs.test-type }} Test is running
       if: ${{ inputs.is-plugin }} == false && ${{ inputs.test-type }} != 'UI' &&  ${{ inputs.test-type }} != 'JS'
+      shell: bash
       run: |
-        ./vendor/phpunit/phpunit/phpunit --configuration ./tests/PHPUnit/phpunit.xml --testsuite ${{ input.test-type }}
+        ./vendor/phpunit/phpunit/phpunit --configuration ./tests/PHPUnit/phpunit.xml --testsuite ${{ inputs.test-type }}
       env:
         TRAVIS: true
         GITHUB: true
@@ -98,6 +103,7 @@ runs:
 
     - name: UI tests Group ${{ matrix.parts }}
       if:  ${{ inputs.is-plugin }} == 'UI'
+      shell: bash
       env:
         GITHUB: true
       run: |
@@ -108,7 +114,7 @@ runs:
       shell: bash
       run: ./scripts/bash/upload_artifacts.sh
       env:
-        ARTIFACTS_PASS: ${{ secrets.ARTIFACTS_PASS }}
+        ARTIFACTS_PASS: ${{ inputs.secrets }}
         GITHUB_REPO: ${{ github.repository }}
         GITHUB_BRANCH: ${{ github.event.pull_request.base.ref }}
         GITHUB_RUN_ID: ${{ github.run_id }}
