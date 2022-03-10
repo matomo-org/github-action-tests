@@ -49,8 +49,8 @@ runs:
       working-directory: /home/runner/work/matomo/matomo
       run: |
         cd plugins/${{ inputs.plugin-name }}
-        git pull origin ${{ input.git-head }}
-        git checkout ${{ input.git-sha }}
+        git pull origin ${{ inputs.git-head }}
+        git checkout ${{ inputs.git-sha }}
 
     - name: Setup PHP
       uses: shivammathur/setup-php@v2
