@@ -1,6 +1,9 @@
-name: 'Matomo Main Tests'
+name: 'Matomo Plugin Tests'
 description: 'Running Matomo Tests'
 inputs:
+  plugin-name:
+    description: "name"
+    required: true
   test-type:
     description: 'test type'
     required: true
@@ -26,14 +29,27 @@ runs:
     - name: Checkout code
       uses: actions/checkout@v2
       with:
+        repository: matomo-org/matomo
         lfs: false
         submodules: recursive
+        path: ./matomo
+    - name: Move File to right place
+      run: |
+        mkdir /home/runner/work/matomo
+        mv ./matomo /home/runner/work/matomo/
+
+    - name: Checkout Submodule to current Pull request
+      working-directory: /home/runner/work/matomo/matomo
+      run: |
+        cd plugins/${{ inputs.plugin-name }}
+        git pull origin ${{ github.head_ref }}
+        git checkout ${{ github.event.pull_request.head.sha }}
 
     - name: Setup PHP
       uses: shivammathur/setup-php@v2
       with:
         php-version: ${{ inputs.php-version }}
-        extensions:  bcmath, ldap, curl, zip, pdo_mysql, mysqli, gd, redis
+        extensions: bcmath, ldap, curl, zip, pdo_mysql, mysqli, gd, redis
         ini-values: |
           memory_limit = 256M,
           max_execution_time=10000,
@@ -46,6 +62,12 @@ runs:
         tools: composer:v2
         coverage: none
 
+    - name: Setup Node
+      if: ${{ inputs.test-type }} == 'UI'
+      uses: actions/setup-node@v2
+        with:
+          node-version: ${{ inputs.node-version }}
+
     - name: prepare setup
       shell: bash
       run: ./scripts/bash/prepare.sh
@@ -54,12 +76,10 @@ runs:
         MATOMO_TEST_TARGET: ${{ inputs.test-type }}
         MYSQL_ADAPTER: ${{ inputs.database-adapter }}
 
-    - name: ${{ inputs.test-type }} Test is running
-      shell: bash
-      run: |
-        ./vendor/phpunit/phpunit/phpunit --configuration ./tests/PHPUnit/phpunit.xml --testsuite ${{ inputs.test-type }}
-      env:
-        TRAVIS: true
-        GITHUB: true
-        PHP_VERSION: ${{ inputs.php-version }}
-        MYSQL_ADAPTER: ${{ inputs.database-adapter }}
+    - name: PluginTests Test runing
+        working-directory: /home/runner/work/matomo/matomo
+        shell: bash
+        run: ./scripts/bash/plugins/pluginTests.sh
+        env:
+          TEST_SUITE: ${{ inputs.test-type }}
+          PLUGIN_NAME: ${{ inputs.plugin-name }}
