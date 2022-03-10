@@ -37,17 +37,23 @@ runs:
       with:
         repository: matomo-org/github-action-tests
         lfs: false
-        path: ./artfect
+        path: ./appendix
 
+    - name: move appendix to right place
+      shell: bash
+      run: |
+        mkdir /home/runner/work/
     - name: Checkout code
       uses: actions/checkout@v2
       with:
         repository: matomo-org/matomo
         lfs: false
         path: ./matomo
+
     - name: Move File to right place
       shell: bash
       run: |
+        mv ./appendix/github-action-tests /home/runner/work/
         mkdir /home/runner/work/matomo
         mv ./matomo /home/runner/work/matomo/
 
@@ -85,7 +91,7 @@ runs:
 
     - name: prepare setup
       shell: bash
-      run: ./artfect/github-action-tests/scripts/bash/prepare.sh
+      run: ./home/runner/work/github-action-tests/scripts/bash/prepare.sh
       env:
         PHP_VERSION: ${{ inputs.php-version }}
         MATOMO_TEST_TARGET: ${{ inputs.test-type }}
@@ -94,7 +100,7 @@ runs:
     - name: PluginTests Test runing
       working-directory: /home/runner/work/matomo/matomo
       shell: bash
-      run: ./artfect/github-action-tests/scripts/bash/plugins/pluginTests.sh
+      run: ./home/runner/work/github-action-tests/scripts/bash/plugins/pluginTests.sh
       env:
         TEST_SUITE: ${{ inputs.test-type }}
         PLUGIN_NAME: ${{ inputs.plugin-name }}
