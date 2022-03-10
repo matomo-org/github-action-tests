@@ -13,11 +13,11 @@ inputs:
     required: true
     default: '7.2'
   php-extensions:
-    description: 'bcmath, ldap, curl, zip, pdo_mysql, mysqli, gd, redis',
+    description: 'php extensions used',
     required: false
-    default: 'bcmath, ldap, curl, zip, pdo_mysql, mysqli, gd, redis'
+    default: "bcmath, ldap, curl, zip, pdo_mysql, mysqli, gd, redis"
   database-adapter:
-    description: 'default PDO "PDO_MYSQL","MYSQLI"'
+    description: 'PDO_MYSQL or MYSQLI'
     required: false
     default: 'PDO_MYSQL'
   node-version:
