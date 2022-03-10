@@ -1,12 +1,6 @@
 name: 'Matomo Plugin Tests'
 description: 'Running Matomo Tests'
 inputs:
-  git-head:
-    description: "head"
-    required: true
-  git-sha:
-    description: "sha"
-    required: true
   plugin-name:
     description: "name"
     required: true
@@ -32,26 +26,21 @@ inputs:
 runs:
   using: "composite"
   steps:
-    - name: Checkout code
+    - name: Checkout code plugin
+      uses: actions/checkout@v2
+
+    - name: Checkout matomo code
       uses: actions/checkout@v2
       with:
         repository: matomo-org/matomo
         lfs: false
-        submodules: recursive
         path: ./matomo
+
     - name: Move File to right place
       shell: bash
       run: |
         mkdir /home/runner/work/matomo
         mv ./matomo /home/runner/work/matomo/
-
-    - name: Checkout Submodule to current Pull request
-      shell: bash
-      working-directory: /home/runner/work/matomo/matomo
-      run: |
-        cd plugins/${{ inputs.plugin-name }}
-        git pull origin ${{ inputs.git-head }}
-        git checkout ${{ inputs.git-sha }}
 
     - name: Setup PHP
       uses: shivammathur/setup-php@v2
