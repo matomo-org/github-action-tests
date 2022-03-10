@@ -1,9 +1,9 @@
-### Matomo Github Action Tests Package
+### Matomo Plugin Github Action Tests Package
 
 This is the package for the matomo test, service still need enter before the job. 
 
 ### Inputs
-
+`plugin-name` `string` `requried`
 `php-version`  `string` Default 7.4, options [7.2, 7.4, 8.0, 8.1],
 
 `node-version` `string` Default 12
