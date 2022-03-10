@@ -88,7 +88,7 @@ runs:
 
     - name: prepare setup
       shell: bash
-      run: ./home/runner/work/github-action-tests/scripts/bash/prepare.sh
+      run: ./home/runner/work/appendix/scripts/bash/prepare.sh
       env:
         PHP_VERSION: ${{ inputs.php-version }}
         MATOMO_TEST_TARGET: ${{ inputs.test-type }}
@@ -97,7 +97,7 @@ runs:
     - name: PluginTests Test runing
       working-directory: /home/runner/work/matomo/matomo
       shell: bash
-      run: ./home/runner/work/github-action-tests/scripts/bash/plugins/pluginTests.sh
+      run: ./home/runner/work/appendix/scripts/bash/plugins/pluginTests.sh
       env:
         TEST_SUITE: ${{ inputs.test-type }}
         PLUGIN_NAME: ${{ inputs.plugin-name }}
