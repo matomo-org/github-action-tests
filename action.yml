@@ -35,6 +35,13 @@ runs:
     - name: Checkout code
       uses: actions/checkout@v2
       with:
+        repository: matomo-org/github-action-tests
+        lfs: false
+        path: ./artfect
+
+    - name: Checkout code
+      uses: actions/checkout@v2
+      with:
         repository: matomo-org/matomo
         lfs: false
         path: ./matomo
@@ -51,6 +58,7 @@ runs:
         cd plugins/${{ inputs.plugin-name }}
         git submodule update --init -- .
         git fetch origin ${{ inputs.git-head }}
+        git checkout ${{ inputs.git-sha }}
 
     - name: Setup PHP
       uses: shivammathur/setup-php@v2
@@ -77,7 +85,7 @@ runs:
 
     - name: prepare setup
       shell: bash
-      run: ./scripts/bash/prepare.sh
+      run: ./artfect/github-action-tests/scripts/bash/prepare.sh
       env:
         PHP_VERSION: ${{ inputs.php-version }}
         MATOMO_TEST_TARGET: ${{ inputs.test-type }}
@@ -86,7 +94,7 @@ runs:
     - name: PluginTests Test runing
       working-directory: /home/runner/work/matomo/matomo
       shell: bash
-      run: ./scripts/bash/plugins/pluginTests.sh
+      run: ./artfect/github-action-tests/scripts/bash/plugins/pluginTests.sh
       env:
         TEST_SUITE: ${{ inputs.test-type }}
         PLUGIN_NAME: ${{ inputs.plugin-name }}
