@@ -12,10 +12,6 @@ inputs:
     description: '7.2-8.1'
     required: true
     default: '7.2'
-  php-extensions:
-    description: 'php extensions used',
-    required: false
-    default: bcmath, ldap, curl, zip, pdo_mysql, mysqli, gd, redis
   database-adapter:
     description: 'PDO_MYSQL or MYSQLI'
     required: false
@@ -55,7 +51,7 @@ runs:
       uses: shivammathur/setup-php@v2
       with:
         php-version: ${{ inputs.php-version }}
-        extensions: ${{ inputs.php-extensions }}
+        extensions:  bcmath, ldap, curl, zip, pdo_mysql, mysqli, gd, redis
         ini-values: |
           memory_limit = 256M,
           max_execution_time=10000,
