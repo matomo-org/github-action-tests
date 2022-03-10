@@ -53,7 +53,8 @@ runs:
     - name: Move File to right place
       shell: bash
       run: |
-        mv ./appendix/github-action-tests /home/runner/work/
+        mkdir /home/runner/work/github-action-test
+        mv ./appendix/github-action-tests /home/runner/work/github-action-test
         mkdir /home/runner/work/matomo
         mv ./matomo /home/runner/work/matomo/
 
