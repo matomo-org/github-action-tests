@@ -38,11 +38,7 @@ runs:
         repository: matomo-org/github-action-tests
         lfs: false
         path: ./appendix
-
-    - name: move appendix to right place
-      shell: bash
-      run: |
-        mkdir /home/runner/work/
+        
     - name: Checkout code
       uses: actions/checkout@v2
       with:
