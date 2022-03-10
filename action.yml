@@ -53,6 +53,7 @@ runs:
         mv ./appendix /home/runner/work/appendix
         mkdir /home/runner/work/matomo
         mv ./matomo /home/runner/work/matomo/
+        ls -l /home/runner/work/appendix
 
     - name: Checkout Submodule to current Pull request
       shell: bash
