@@ -33,10 +33,10 @@ runs:
   using: "composite"
   steps:
     - name: Checkout code
-      uses: actions/checkout@v2
-      with:
-        repository: matomo-org/github-action-tests
-        path: ./appendix
+      shell: bash
+      run: |
+        cd /home/runner/work/
+        git clone https://github.com/matomo-org/github-action-tests.git appendix
 
     - name: Checkout code
       uses: actions/checkout@v2
@@ -47,8 +47,6 @@ runs:
     - name: Move File to right place
       shell: bash
       run: |
-        mkdir /home/runner/work/appendix
-        mv ./appendix /home/runner/work/appendix
         mkdir /home/runner/work/matomo
         mv ./matomo /home/runner/work/matomo/
         ls -l /home/runner/work/appendix
