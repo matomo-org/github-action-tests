@@ -97,3 +97,10 @@ sudo chmod -R 777 /home/runner/work/matomo/matomo/tmp
 sudo chmod -R 777 /tmp
 sudo chmod -R 777 /home/runner/work/matomo/matomo/tmp/templates_c
 sudo chmod -R 777 /home/runner/work/matomo/matomo/tests/UI
+
+
+if [ "$ADDITION" == "ldap" ];
+then
+  echo -e "${GREEN}set up ldap${SET}"
+  source $ARTIFACT/scripts/setup_ldap.sh
+fi
