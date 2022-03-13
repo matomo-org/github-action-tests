@@ -4,14 +4,14 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 SET='\033[0m'
 
-ARTIFACT_PATH=/home/runner/work/appendix/artifacts
+ARTIFACT=/home/runner/work/appendix/artifacts
 
 # set up fonts
 if [ "$MATOMO_TEST_TARGET" = "UI" ]
 then
   echo -e "${GREEN}Setup fonts${SET}"
   mkdir $HOME/.fonts
-  cp  $ARTIFACT_PATH/fonts/* $HOME/.fonts
+  cp  $ARTIFACT/fonts/* $HOME/.fonts
   fc-cache -f -v
   ls $HOME/.fonts
   sudo sed -i -E 's/name="memory" value="[^"]+"/name="memory" value="2GiB"/g' /etc/ImageMagick-6/policy.xml
@@ -28,7 +28,7 @@ echo -e "${GREEN}install composer${SET}"
 composer install --ignore-platform-reqs
 
 # setup config
-sed "s/PDO_MYSQL/${MYSQL_ADAPTER}/g" $ARTIFACT_PATH/config.ini.github.php > /home/runner/work/matomo/matomo/config/config.ini.php
+sed "s/PDO_MYSQL/${MYSQL_ADAPTER}/g" $ARTIFACT/config.ini.github.php > /home/runner/work/matomo/matomo/config/config.ini.php
 tail -f /home/runner/work/matomo/matomo/config/config.ini.php
 
 # setup js and xml
@@ -53,13 +53,13 @@ echo -e "${GREEN}setup php-fpm${SET}"
 cd /home/runner/work/matomo/matomo/
 sudo systemctl enable php$PHP_VERSION-fpm.service
 sudo systemctl start php$PHP_VERSION-fpm.service
-sudo cp $ARTIFACT_PATH/www.conf /etc/php/$PHP_VERSION/fpm/pool.d/
+sudo cp $ARTIFACT/www.conf /etc/php/$PHP_VERSION/fpm/pool.d/
 sudo systemctl reload php$PHP_VERSION-fpm.service
 sudo systemctl restart php$PHP_VERSION-fpm.service
 sudo systemctl status php$PHP_VERSION-fpm.service
 sudo systemctl enable nginx
 sudo systemctl start nginx
-sudo cp $ARTIFACT_PATH/ui_nginx.conf /etc/nginx/conf.d/
+sudo cp $ARTIFACT/ui_nginx.conf /etc/nginx/conf.d/
 sudo unlink /etc/nginx/sites-enabled/default
 sudo systemctl reload nginx
 sudo systemctl restart nginx
