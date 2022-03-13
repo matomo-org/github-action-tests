@@ -17,10 +17,6 @@ inputs:
     description: '7.2-8.1'
     required: true
     default: '7.2'
-  database-adapter:
-    description: 'PDO_MYSQL or MYSQLI'
-    required: false
-    default: 'PDO_MYSQL'
   node-version:
     description: 'node version default 12'
     required: false
@@ -89,7 +85,7 @@ runs:
       env:
         PHP_VERSION: ${{ inputs.php-version }}
         MATOMO_TEST_TARGET: ${{ inputs.test-type }}
-        MYSQL_ADAPTER: ${{ inputs.database-adapter }}
+        MYSQL_ADAPTER: 'PDO_MYSQL'
 
     - name: PluginTests Test runing
       working-directory: /home/runner/work/matomo/matomo
