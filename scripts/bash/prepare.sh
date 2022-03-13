@@ -28,7 +28,8 @@ echo -e "${GREEN}install composer${SET}"
 composer install --ignore-platform-reqs
 
 # setup config
-sed "s/PDO_MYSQL/${MYSQL_ADAPTER}/g" $ARTIFACT_PATH/config.ini.github.php > config/config.ini.php
+sed "s/PDO_MYSQL/${MYSQL_ADAPTER}/g" $ARTIFACT_PATH/config.ini.github.php > /home/runner/work/matomo/matomo/config/config.ini.php
+tail -f /home/runner/work/matomo/matomo/config/config.ini.php
 
 # setup js and xml
 if [ "$MATOMO_TEST_TARGET" = "UI" ]
