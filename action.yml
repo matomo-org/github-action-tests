@@ -24,6 +24,7 @@ inputs:
   addition:
     description: 'additional test or setup'
     required: false
+    default: ''
   secrets:
     description: ''
     required: false
@@ -93,7 +94,7 @@ runs:
     - name: Setup ldap
       if: ${{ inputs.addition }} == 'ldap'
       shell: bash
-      run: /home/runner/work/appendix/scripts/bash/setup_ldap.sh
+      run: /home/runner/work/appendix/scripts/setup_ldap.sh
 
     - name: PluginTests Test runing
       working-directory: /home/runner/work/matomo/matomo
