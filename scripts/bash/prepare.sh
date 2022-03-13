@@ -4,7 +4,7 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 SET='\033[0m'
 
-ARTIFACT_PATH = /home/runner/work/appendix/artifacts;
+ARTIFACT_PATH=/home/runner/work/appendix/artifacts
 
 # set up fonts
 if [ "$MATOMO_TEST_TARGET" = "UI" ]
