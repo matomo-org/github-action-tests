@@ -21,6 +21,9 @@ inputs:
     description: 'node version default 12'
     required: false
     default: '12'
+  addition:
+    description: 'additional test or setup'
+    required: false
   secrets:
     description: ''
     required: false
@@ -86,6 +89,11 @@ runs:
         PHP_VERSION: ${{ inputs.php-version }}
         MATOMO_TEST_TARGET: ${{ inputs.test-type }}
         MYSQL_ADAPTER: 'PDO_MYSQL'
+
+    - name: Setup ldap
+      if: ${{ inputs.addition }} == 'ldap'
+      shell: bash
+      run: /home/runner/work/appendix/scripts/bash/setup_ldap.sh
 
     - name: PluginTests Test runing
       working-directory: /home/runner/work/matomo/matomo
