@@ -78,7 +78,6 @@ runs:
         coverage: none
 
     - name: Setup Node
-      if: ${{ inputs.test-type }} == 'UI'
       uses: actions/setup-node@v2
       with:
         node-version: ${{ inputs.node-version }}
@@ -90,6 +89,7 @@ runs:
         PHP_VERSION: ${{ inputs.php-version }}
         MATOMO_TEST_TARGET: ${{ inputs.test-type }}
         MYSQL_ADAPTER: 'PDO_MYSQL'
+        ADDITION: ${{ inputs.addition }}
 
     - name: Setup ldap
       if: ${{ inputs.addition }} == 'ldap'
