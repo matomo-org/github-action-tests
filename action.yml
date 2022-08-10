@@ -1,6 +1,16 @@
-name: 'Matomo Plugin Tests'
+name: 'Matomo Tests'
 description: 'Running Matomo Tests'
 inputs:
+  test-type:
+    type: choice
+    description: "test type"
+    required: true
+    options:
+      - UI
+      - PHP
+      - PluginTests
+      - JS
+      - Angular
   git-head:
     description: "head"
     required: true
@@ -9,10 +19,17 @@ inputs:
     required: true
   plugin-name:
     description: "name"
-    required: true
-  test-type:
-    description: 'test type'
-    required: true
+    required: false
+  mysql-driver:
+    type: choice
+    description: "Mysql driver"
+    required: false
+    options:
+      - PDO_MYSQL
+      - MYSQLI
+  test-command:
+    description: "Test name"
+    required: false
   php-version:
     description: '7.2-8.1'
     required: true
@@ -64,9 +81,9 @@ runs:
       uses: shivammathur/setup-php@v2
       with:
         php-version: ${{ inputs.php-version }}
-        extensions: bcmath, ldap, curl, zip, pdo_mysql, mysqli, gd, redis
+        extensions: bcmath, ldap, curl, zip, pdo_mysql, mysqli, gd, redis, zlib, opcache
         ini-values: |
-          memory_limit = 4024M,
+          memory_limit = 256M,
           max_execution_time=10000,
           always_populate_raw_post_data=-1,
           error_reporting=E_ALL,
@@ -74,6 +91,8 @@ runs:
           allow_url_fopen = on,
           zend.exception_ignore_args = Off
           mysqli.allow_local_infile = On
+          opcache.enable = 1
+          opcache.enable_cli=1
         tools: composer:v2
         coverage: none
 
@@ -88,7 +107,7 @@ runs:
       env:
         PHP_VERSION: ${{ inputs.php-version }}
         MATOMO_TEST_TARGET: ${{ inputs.test-type }}
-        MYSQL_ADAPTER: 'PDO_MYSQL'
+        MYSQL_ADAPTER:  ${{ inputs.mysql-driver }}
         ADDITION: ${{ inputs.addition }}
 
     - name: Setup ldap
@@ -97,9 +116,20 @@ runs:
       run: /home/runner/work/appendix/scripts/setup_ldap.sh
 
     - name: PluginTests Test runing
+      if: ${{ inputs.test-type }} == 'PluginTests'
       working-directory: /home/runner/work/matomo/matomo
       shell: bash
       run: /home/runner/work/appendix/scripts/bash/plugins/pluginTests.sh
       env:
         TEST_SUITE: ${{ inputs.test-type }}
         PLUGIN_NAME: ${{ inputs.plugin-name }}
+
+    - name: Test running
+      if: ${{ inputs.test-type }} == 'PHP'
+      run: |
+        ./vendor/phpunit/phpunit/phpunit --configuration ./tests/PHPUnit/phpunit.xml --testsuite ${{ inputs.test-command }}
+      env:
+        GITHUB: true
+        PHP_VERSION: ${{ inputs.php-version }}
+        MYSQL_ADAPTER: ${{ inputs.mysql-driver }}
+
