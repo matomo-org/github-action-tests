@@ -33,11 +33,11 @@ inputs:
   php-version:
     description: '7.2-8.1'
     required: true
-    default: '7.2'
+    default: ''
   node-version:
     description: 'node version default 12'
     required: false
-    default: '12'
+    default: ''
   addition:
     description: 'additional test or setup'
     required: false
@@ -56,12 +56,14 @@ runs:
         git clone https://github.com/matomo-org/github-action-tests.git appendix
 
     - name: Checkout code
-      uses: actions/checkout@v2
+      if: inputs.tests-type == 'PluginTests'
+      uses: actions/checkout@v3
       with:
         repository: matomo-org/matomo
         path: ./matomo
 
     - name: Move File to right place
+      if: inputs.tests-type == 'PluginTests'
       shell: bash
       run: |
         mkdir /home/runner/work/matomo
@@ -69,6 +71,7 @@ runs:
         ls -l /home/runner/work/appendix
 
     - name: Checkout Submodule to current Pull request
+      if: inputs.tests-type == 'PluginTests'
       shell: bash
       working-directory: /home/runner/work/matomo/matomo
       run: |
@@ -77,7 +80,10 @@ runs:
         git fetch origin ${{ inputs.git-head }}
         git checkout ${{ inputs.git-sha }}
 
+
+      # setup php
     - name: Setup PHP
+      if: inputs.php-version != ''
       uses: shivammathur/setup-php@v2
       with:
         php-version: ${{ inputs.php-version }}
@@ -96,27 +102,40 @@ runs:
         tools: composer:v2
         coverage: none
 
+      # if required node setup node
     - name: Setup Node
+      if: inputs.node-version != ''
       uses: actions/setup-node@v2
       with:
         node-version: ${{ inputs.node-version }}
 
+      # setup apache etc
     - name: prepare setup
       shell: bash
       run: /home/runner/work/appendix/scripts/bash/prepare.sh
       env:
         PHP_VERSION: ${{ inputs.php-version }}
         MATOMO_TEST_TARGET: ${{ inputs.test-type }}
-        MYSQL_ADAPTER:  ${{ inputs.mysql-driver }}
+        MYSQL_ADAPTER: ${{ inputs.mysql-driver }}
         ADDITION: ${{ inputs.addition }}
 
+      # adding google woff
+    - name: set up google woff
+      if: inputs.test-command == 'IntegrationTestsCore'
+      run: |
+        git clone --recursive https://github.com/google/woff2.git ../travis_woff2
+        cd ../travis_woff2
+        make clean all
+
+      # setting up ldap for plugin
     - name: Setup ldap
-      if: ${{ inputs.addition }} == 'ldap'
+      if: inputs.addition == 'ldap'
       shell: bash
       run: /home/runner/work/appendix/scripts/setup_ldap.sh
 
+      # setting up plugin tests
     - name: PluginTests Test runing
-      if: ${{ inputs.test-type }} == 'PluginTests'
+      if: inputs.test-type == 'PluginTests'
       working-directory: /home/runner/work/matomo/matomo
       shell: bash
       run: /home/runner/work/appendix/scripts/bash/plugins/pluginTests.sh
@@ -124,8 +143,9 @@ runs:
         TEST_SUITE: ${{ inputs.test-type }}
         PLUGIN_NAME: ${{ inputs.plugin-name }}
 
+      # running php or integration tests
     - name: Test running
-      if: ${{ inputs.test-type }} == 'PHP'
+      if: inputs.test-type == 'PHP'
       run: |
         ./vendor/phpunit/phpunit/phpunit --configuration ./tests/PHPUnit/phpunit.xml --testsuite ${{ inputs.test-command }}
       env:
@@ -133,3 +153,19 @@ runs:
         PHP_VERSION: ${{ inputs.php-version }}
         MYSQL_ADAPTER: ${{ inputs.mysql-driver }}
 
+      # system checks failed, upload expected xml and PDF
+    - name: upload artfact
+        if: failure() && inputs.test-type == 'PHP'
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ github.run_id }}
+          path: |
+            /home/runner/work/matomo/matomo/plugins/**/tests/System/processed/**
+
+    - name: download artface
+        if: failure() && inputs.test-type == 'PHP'
+        uses: actions/download-artifact@v3
+        with:
+          name: ${{ github.run_id }}
+          path: |
+            /home/runner/work/matomo/matomo/plugins/**/tests/System/processed/**
