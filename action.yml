@@ -122,6 +122,7 @@ runs:
       # adding google woff
     - name: set up google woff
       if: inputs.test-command == 'IntegrationTestsCore'
+      shell: bash
       run: |
         git clone --recursive https://github.com/google/woff2.git ../travis_woff2
         cd ../travis_woff2
@@ -146,6 +147,7 @@ runs:
       # running php or integration tests
     - name: Test running
       if: inputs.test-type == 'PHP'
+      shell: bash
       run: |
         ./vendor/phpunit/phpunit/phpunit --configuration ./tests/PHPUnit/phpunit.xml --testsuite ${{ inputs.test-command }}
       env:
@@ -155,17 +157,17 @@ runs:
 
       # system checks failed, upload expected xml and PDF
     - name: upload artfact
-        if: failure() && inputs.test-type == 'PHP'
-        uses: actions/upload-artifact@v3
-        with:
-          name: ${{ github.run_id }}
-          path: |
-            /home/runner/work/matomo/matomo/plugins/**/tests/System/processed/**
+      if: failure() && inputs.test-type == 'PHP'
+      uses: actions/upload-artifact@v3
+      with:
+        name: ${{ github.run_id }}
+        path: |
+          /home/runner/work/matomo/matomo/plugins/**/tests/System/processed/**
 
     - name: download artface
-        if: failure() && inputs.test-type == 'PHP'
-        uses: actions/download-artifact@v3
-        with:
-          name: ${{ github.run_id }}
-          path: |
-            /home/runner/work/matomo/matomo/plugins/**/tests/System/processed/**
+      if: failure() && inputs.test-type == 'PHP'
+      uses: actions/download-artifact@v3
+      with:
+        name: ${{ github.run_id }}
+        path: |
+          /home/runner/work/matomo/matomo/plugins/**/tests/System/processed/**
