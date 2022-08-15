@@ -17,6 +17,21 @@ inputs:
   git-sha:
     description: "sha"
     required: true
+  run_id:
+    description: "GitHub Run Id"
+    required: false
+  repository:
+    description: "GitHub repository"
+    required: false
+  run_number:
+    description: "GitHub run number"
+    required: false
+  artifect_pass:
+    description: "UI upload passs"
+    required: false
+  ref:
+    description: "Pull request ref"
+    required: false
   plugin-name:
     description: "name"
     required: false
@@ -171,3 +186,43 @@ runs:
         name: ${{ github.run_id }}
         path: |
           /home/runner/work/matomo/matomo/plugins/**/tests/System/processed/**
+
+
+    - name: UI tests Group ${{ matrix.parts }}
+      if: inputs.test-type == 'UI'
+      env:
+        GITHUB: true
+      run: |
+        ./console tests:run-ui --store-in-ui-tests-repo --persist-fixture-data --assume-artifacts --core --extra-options="--num-test-groups=8 --test-group=${{ inputs.test-command }}"
+
+    - name: upload processed screenshots
+      if: failure() && inputs.test-type == 'UI'
+      shell: bash
+      run: ./.github/scripts/bash/upload_artifacts.sh
+      env:
+        ARTIFACTS_PASS: ${{ inputs.artifect_pass }}
+        GITHUB_REPO: ${{ inputs.repository }}
+        GITHUB_BRANCH: ${{ inputs.ref }}
+        GITHUB_RUN_ID: ${{ inputs.run_id }}
+        GITHUB_RUN_NUMBER: ${{ inputs.run_number }}
+
+    - name: View UI failures
+      if: failure() && inputs.test-type == 'UI'
+      shell: bash
+      run: ./.github/scripts/bash/view_ui_failed.sh
+      env:
+        GITHUB_REPO: ${{ inputs.repository }}
+        GITHUB_BRANCH: ${{ inputs.ref }}
+        GITHUB_RUN_ID: ${{ inputs.run_id }}
+
+    - name: Running angularjs && vue tests
+      if: matrix.test-type == 'Angular'
+      working-directory: ./tests/angularjs
+      run: |
+          npm install
+          ./node_modules/karma/bin/karma start karma.conf.js --browsers ChromeHeadless --single-run
+
+    - name: Javascript Tests
+      if: inputs.test-type == 'JS'
+      run: |
+        ./console tests:run-js --matomo-url='http://localhost'
