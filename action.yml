@@ -199,7 +199,7 @@ runs:
     - name: upload processed screenshots
       if: failure() && inputs.test-type == 'UI'
       shell: bash
-      run: ./.github/scripts/bash/upload_artifacts.sh
+      run: /home/runner/work/appendix/scripts/bash/upload_artifacts.sh
       env:
         ARTIFACTS_PASS: ${{ inputs.artifect_pass }}
         GITHUB_REPO: ${{ inputs.repository }}
@@ -210,7 +210,7 @@ runs:
     - name: View UI failures
       if: failure() && inputs.test-type == 'UI'
       shell: bash
-      run: ./.github/scripts/bash/view_ui_failed.sh
+      run: /home/runner/work/appendix/scripts/bash/view_ui_failed.sh
       env:
         GITHUB_REPO: ${{ inputs.repository }}
         GITHUB_BRANCH: ${{ inputs.ref }}
