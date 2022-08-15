@@ -217,7 +217,7 @@ runs:
         GITHUB_RUN_ID: ${{ inputs.run_id }}
 
     - name: Running angularjs && vue tests
-      if: matrix.test-type == 'Angular'
+      if: inputs.test-type == 'Angular'
       shell: bash
       working-directory: ./tests/angularjs
       run: |
