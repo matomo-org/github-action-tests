@@ -55,8 +55,13 @@ else
 fi
 
 # if just js tests, running php -S otherwise use php fpm
-if [ "$MATOMO_TEST_TARGET" = "JS" ];
+if [ "$MATOMO_TEST_TARGET" = "JS" ] || [ "$MATOMO_TEST_TARGET" = "Angular" ];
 then
+  echo -e "${GREEN}installing node/puppeteer${SET}"
+  cd /home/runner/work/matomo/matomo/tests/lib/screenshot-testing
+  git lfs pull --exclude=
+  npm install
+  cd /home/runner/work/matomo/matomo/
   echo -e "${GREEN}start php on 80${SET}"
   sudo setcap CAP_NET_BIND_SERVICE=+eip $(readlink -f $(which php))
   tmux new-session -d -s "php-cgi" sudo php -S 127.0.0.1:80
