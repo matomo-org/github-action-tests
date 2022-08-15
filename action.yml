@@ -221,8 +221,14 @@ runs:
       shell: bash
       working-directory: ./tests/angularjs
       run: |
-          npm install
-          ./node_modules/karma/bin/karma start karma.conf.js --browsers ChromeHeadless --single-run
+        npm install
+        ./node_modules/karma/bin/karma start karma.conf.js --browsers ChromeHeadless --single-run
+
+    - name: installing node/puppeteer
+      if: matrix.test-type == 'JS'
+      shell: bash
+      working-directory: ./tests/lib/screenshot-testing
+      run: npm install
 
     - name: Javascript Tests
       if: inputs.test-type == 'JS'
