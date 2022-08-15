@@ -10,7 +10,7 @@ if [ "$MATOMO_TEST_TARGET" = "UI" ];
 then
   echo -e "${GREEN}Setup fonts${SET}"
   mkdir $HOME/.fonts
-  cp /home/runner/work/matomo/matomo/.github/artifacts/fonts/* $HOME/.fonts
+  cp /home/runner/work/appendix/artifacts/fonts/* $HOME/.fonts
   fc-cache -f -v
   ls $HOME/.fonts
   sudo sed -i -E 's/name="memory" value="[^"]+"/name="memory" value="2GiB"/g' /etc/ImageMagick-6/policy.xml
@@ -35,7 +35,7 @@ fi
 
 
 # setup config
-sed "s/PDO\\\MYSQL/${MYSQL_ADAPTER}/g" .github/artifacts/config.ini.github.php > config/config.ini.php
+sed "s/PDO\\\MYSQL/${MYSQL_ADAPTER}/g" /home/runner/work/appendix/artifacts/config.ini.github.php > config/config.ini.php
 
 # setup js and phpunit.xml
 if [ "$MATOMO_TEST_TARGET" = "UI" ];
@@ -71,13 +71,13 @@ else
   cd /home/runner/work/matomo/matomo/
   sudo systemctl enable php$PHP_VERSION-fpm.service
   sudo systemctl start php$PHP_VERSION-fpm.service
-  sudo cp ./.github/artifacts/www.conf /etc/php/$PHP_VERSION/fpm/pool.d/
+  sudo cp /home/runner/work/appendix/artifacts/www.conf /etc/php/$PHP_VERSION/fpm/pool.d/
   sudo systemctl reload php$PHP_VERSION-fpm.service
   sudo systemctl restart php$PHP_VERSION-fpm.service
   sudo systemctl status php$PHP_VERSION-fpm.service
   sudo systemctl enable nginx
   sudo systemctl start nginx
-  sudo cp ./.github/artifacts/ui_nginx.conf /etc/nginx/conf.d/
+  sudo cp /home/runner/work/appendix/artifacts/ui_nginx.conf /etc/nginx/conf.d/
   sudo unlink /etc/nginx/sites-enabled/default
   sudo systemctl reload nginx
   sudo systemctl restart nginx
