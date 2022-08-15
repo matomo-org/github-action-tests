@@ -71,13 +71,15 @@ else
   cd /home/runner/work/matomo/matomo/
   sudo systemctl enable php$PHP_VERSION-fpm.service
   sudo systemctl start php$PHP_VERSION-fpm.service
-  sudo cp /home/runner/work/appendix/artifacts/www.conf /etc/php/$PHP_VERSION/fpm/pool.d/
+  sudo sed 's/7.2/$PHP_VERSION/g' /home/runner/work/appendix/artifacts/www.conf
+  sudo cp /home/runner/work/appendix/artifacts/www.conf  /etc/php/$PHP_VERSION/fpm/pool.d/
   sudo systemctl reload php$PHP_VERSION-fpm.service
   sudo systemctl restart php$PHP_VERSION-fpm.service
   sudo systemctl status php$PHP_VERSION-fpm.service
   sudo systemctl enable nginx
   sudo systemctl start nginx
-  sudo cp /home/runner/work/appendix/artifacts/ui_nginx.conf /etc/nginx/conf.d/
+  sudo sed 's/7.2/$PHP_VERSION/g' /home/runner/work/appendix/artifacts/ui_nginx.conf
+  sudo cp  /home/runner/work/appendix/artifacts/ui_nginx.conf /etc/nginx/conf.d/
   sudo unlink /etc/nginx/sites-enabled/default
   sudo systemctl reload nginx
   sudo systemctl restart nginx
