@@ -190,6 +190,7 @@ runs:
 
     - name: UI tests Group ${{ matrix.parts }}
       if: inputs.test-type == 'UI'
+      shell: bash
       env:
         GITHUB: true
       run: |
@@ -217,6 +218,7 @@ runs:
 
     - name: Running angularjs && vue tests
       if: matrix.test-type == 'Angular'
+      shell: bash
       working-directory: ./tests/angularjs
       run: |
           npm install
@@ -224,5 +226,6 @@ runs:
 
     - name: Javascript Tests
       if: inputs.test-type == 'JS'
+      shell: bash
       run: |
         ./console tests:run-js --matomo-url='http://localhost'
