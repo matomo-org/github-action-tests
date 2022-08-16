@@ -169,6 +169,7 @@ runs:
       run: |
         ./vendor/phpunit/phpunit/phpunit --configuration ./tests/PHPUnit/phpunit.xml --testsuite ${{ inputs.test-command }}
       env:
+        TRAVIS: true
         GITHUB: true
         PHP_VERSION: ${{ inputs.php-version }}
         MYSQL_ADAPTER: ${{ inputs.mysql-driver }}
