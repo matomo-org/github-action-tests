@@ -36,7 +36,6 @@ inputs:
     description: "name"
     required: false
   mysql-driver:
-    type: choice
     description: "Mysql driver"
     required: false
     options:
@@ -60,6 +59,10 @@ inputs:
   secrets:
     description: ''
     required: false
+  php-memory:
+    description: "php memory limit"
+    required: false
+    default: "256M"
 
 runs:
   using: "composite"
@@ -105,7 +108,7 @@ runs:
         extensions: bcmath, ldap, curl, zip, pdo_mysql, mysqli, gd, redis, zlib, opcache
         ini-values: |
           post_max_size=256M
-          memory_limit=-1,
+          memory_limit=${{ inputs.php-memory}},
           max_execution_time=10000,
           always_populate_raw_post_data=-1,
           error_reporting=E_ALL,
