@@ -64,7 +64,7 @@ inputs:
     required: false
     default: "256M"
   redis-service:
-    type: boolen
+    type: boolean
     description: "require reds services"
     required: false
     default: false
