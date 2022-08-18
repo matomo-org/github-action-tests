@@ -64,7 +64,7 @@ inputs:
     required: false
     default: "256M"
   redis-service:
-    type: boolean
+    type: boolen
     description: "require reds services"
     required: false
     default: false
@@ -74,32 +74,35 @@ inputs:
     required: false
     default: true
 
-
-services:
-  redis:
-    if: inputs.redis-service
-    image: redis:5.0
-    ports:
-      - 6379:6379
-    options: --entrypoint redis-server
-  redis-sentinel:
-    if: inputs.redis-service
-    image: 'bitnami/redis-sentinel:latest'
-    ports:
-      - 26379:26379
-  mysql:
-    if: inputs.mysql-service
-    image: mysql:5.7
-    ports:
-      - 3306:3306
-    env:
-      MYSQL_DATABASE: matomo_tests
-      MYSQL_ALLOW_EMPTY_PASSWORD: yes
-    options: --tmpfs /var/lib/mysql:rw --health-cmd="mysqladmin ping" --health-interval=5s --health-timeout=2s --health-retries=3
-
 runs:
   using: "composite"
   steps:
+    - name: start mysql services
+      if: inputs.mysql-service
+      using: 'docker'
+      image: mysql:5.7
+      env:
+        MYSQL_DATABASE: matomo_tests
+        MYSQL_ALLOW_EMPTY_PASSWORD: yes
+      ports:
+        - 26379:26379
+      options: --tmpfs /var/lib/mysql:rw --health-cmd="mysqladmin ping" --health-interval=5s --health-timeout=2s --health-retries=3
+
+    - name: start redis serivces
+      if: input.redis-service
+      using: 'docker'
+      image: redis:5.0
+      ports:
+        - 6379:6379
+      options: --entrypoint redis-server
+
+    - name: start redis sentinel
+      if: inputs.redis-service
+      using: 'docker'
+      image: 'bitnami/redis-sentinel:latest'
+      ports:
+        - 26379:26379
+        -
     - name: Checkout code
       shell: bash
       run: |
