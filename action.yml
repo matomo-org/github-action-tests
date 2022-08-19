@@ -79,16 +79,19 @@ runs:
   steps:
     - name: start mysql services
       if: inputs.mysql-service
+      shell: bash
       run: |
         docker run --name some-mysql -e MYSQL_ALLOW_EMPTY_PASSWORD=yes MYSQL_DATABASE=matomo_tests  -d mysql:5.7
 
     - name: start redis serivces
       if: input.redis-service
+      shell: bash
       run: |
         docker run --name matomo-redis -p 6379:6379 -d redis
 
     - name: start redis sentinel
       if: inputs.redis-service
+      shell: bash
       run: |
         docker run --name redis-sentinel -p 26379:26379 -e REDIS_MASTER_HOST=redis bitnami/redis-sentinel:latest
 
