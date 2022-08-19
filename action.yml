@@ -93,7 +93,7 @@ runs:
       if: inputs.redis-service
       shell: bash
       run: |
-        docker run --name redis-sentinel -p 26379:26379 -e REDIS_MASTER_HOST=redis bitnami/redis-sentinel:latest
+        docker run --name redis-sentinel -p 26379:26379 -e REDIS_MASTER_HOST=matomo-redis bitnami/redis-sentinel:latest
 
     - name: Checkout code
       shell: bash
