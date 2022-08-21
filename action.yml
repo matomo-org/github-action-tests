@@ -111,6 +111,8 @@ runs:
         repository: matomo-org/matomo
         path: ./matomo
         ref: ${{ inputs.git-sha }}
+        lfs: true
+        submodules: recursive
 
 
     - name: Checkout code
