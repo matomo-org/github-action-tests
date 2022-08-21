@@ -3,6 +3,11 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 SET='\033[0m'
 
+# composer install
+echo -e "${GREEN}install composer${SET}"
+composer install --ignore-platform-reqs
+
+
 if [ -n "$TEST_SUITE" ]
 then
     echo -e "${GREEN}Executing tests in test suite $TEST_SUITE...${SET}"
