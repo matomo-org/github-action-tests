@@ -102,15 +102,24 @@ runs:
         cd /home/runner/work/
         git clone https://github.com/matomo-org/github-action-tests.git appendix
 
+
+    - name: Checkout code for pull request
+      if: inputs.test-command != 'PluginTests'
+      with:
+        repository: matomo-org/matomo
+        path: ./matomo
+        ref: ${{ inputs.git-sha }}
+
+
     - name: Checkout code
-      if: inputs.test-type == 'PluginTests'
+      if: inputs.test-command == 'PluginTests'
       uses: actions/checkout@v3
       with:
         repository: matomo-org/matomo
         path: ./matomo
 
     - name: Move File to right place
-      if: inputs.test-type == 'PluginTests'
+      if: inputs.test-command == 'PluginTests'
       shell: bash
       run: |
         mkdir /home/runner/work/matomo
@@ -118,7 +127,7 @@ runs:
         ls -l /home/runner/work/appendix
 
     - name: Checkout Submodule to current Pull request
-      if: inputs.test-type == 'PluginTests'
+      if: inputs.test-command == 'PluginTests'
       shell: bash
       working-directory: /home/runner/work/matomo/matomo
       run: |
