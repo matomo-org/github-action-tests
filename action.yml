@@ -41,6 +41,7 @@ inputs:
     options:
       - PDO_MYSQL
       - MYSQLI
+    default: PDO_MYSQL
   test-command:
     description: "Test name"
     required: false
