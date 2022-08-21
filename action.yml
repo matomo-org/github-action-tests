@@ -160,7 +160,6 @@ runs:
 
       # setup apache etc
     - name: prepare setup
-      if: inputs.test-type != 'PluginTests'
       shell: bash
       run: /home/runner/work/appendix/scripts/bash/prepare.sh
       env:
