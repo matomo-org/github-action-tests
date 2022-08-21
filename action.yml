@@ -103,14 +103,14 @@ runs:
         git clone https://github.com/matomo-org/github-action-tests.git appendix
 
     - name: Checkout code
-      if: inputs.tests-type == 'PluginTests'
+      if: inputs.test-type == 'PluginTests'
       uses: actions/checkout@v3
       with:
         repository: matomo-org/matomo
         path: ./matomo
 
     - name: Move File to right place
-      if: inputs.tests-type == 'PluginTests'
+      if: inputs.test-type == 'PluginTests'
       shell: bash
       run: |
         mkdir /home/runner/work/matomo
@@ -118,7 +118,7 @@ runs:
         ls -l /home/runner/work/appendix
 
     - name: Checkout Submodule to current Pull request
-      if: inputs.tests-type == 'PluginTests'
+      if: inputs.test-type == 'PluginTests'
       shell: bash
       working-directory: /home/runner/work/matomo/matomo
       run: |
