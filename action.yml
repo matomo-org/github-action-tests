@@ -81,7 +81,7 @@ runs:
       if: inputs.mysql-service
       shell: bash
       run: |
-        docker run --d --name mysql \
+        docker run -d --name mysql \
             -e ALLOW_EMPTY_PASSWORD=yes \
             -e MYSQL_DATABASE=matomo_tests \
             bitnami/mysql:5.7
@@ -90,8 +90,8 @@ runs:
       if: inputs.redis-service
       shell: bash
       run: |
-        docker run --d --name redis -e ALLOW_EMPTY_PASSWORD=yes -p 6379:6379 bitnami/redis:latest
-        docker run --d --name redis-sentinel -p 26379:26379 bitnami/redis-sentinel:latest
+        docker run -d --name redis -e ALLOW_EMPTY_PASSWORD=yes -p 6379:6379 bitnami/redis:latest
+        docker run -d --name redis-sentinel -p 26379:26379 bitnami/redis-sentinel:latest
 
     - name: Checkout code
       shell: bash
