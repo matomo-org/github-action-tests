@@ -81,7 +81,10 @@ runs:
       if: inputs.mysql-service
       shell: bash
       run: |
-        docker run --name mysql -e MYSQL_ALLOW_EMPTY_PASSWORD=yes -e MYSQL_DATABASE=matomo_tests  -d mysql:5.7
+        docker run --name mysql \
+            -e ALLOW_EMPTY_PASSWORD=yes \
+            -e MYSQL_DATABASE=matomo_tests \
+            bitnami/mysql:5.7
 
     - name: start redis serivces
       if: inputs.redis-service
