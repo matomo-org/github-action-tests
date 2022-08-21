@@ -82,7 +82,7 @@ runs:
       shell: bash
       run: |
         docker run -d --name mysql \
-            -p 3306:3306
+            -p 3306:3306 \
             -e ALLOW_EMPTY_PASSWORD=yes \
             -e MYSQL_DATABASE=matomo_tests \
             bitnami/mysql:5.7
