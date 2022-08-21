@@ -70,7 +70,7 @@ inputs:
     options:
       - true
       - false
-      default: false
+    default: false
   mysql-service:
     type: choice
     description: "require mysql services"
