@@ -185,12 +185,12 @@ runs:
 
       # setting up plugin tests
     - name: PluginTests Test runing
-      if: inputs.test-type == 'PluginTests'
+      if: inputs.test-command == 'PluginTests'
       working-directory: /home/runner/work/matomo/matomo
       shell: bash
       run: /home/runner/work/appendix/scripts/bash/plugins/pluginTests.sh
       env:
-        TEST_SUITE: ${{ inputs.test-command }}
+        TEST_SUITE: ${{ inputs.test-type }}
         PLUGIN_NAME: ${{ inputs.plugin-name }}
 
       # running php or integration tests
