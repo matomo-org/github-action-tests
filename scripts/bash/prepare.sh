@@ -75,7 +75,6 @@ else
   sudo cp /home/runner/work/appendix/artifacts/www.conf  /etc/php/$PHP_VERSION/fpm/pool.d/
   sudo systemctl reload php$PHP_VERSION-fpm.service
   sudo systemctl restart php$PHP_VERSION-fpm.service
-  sudo systemctl status php$PHP_VERSION-fpm.service
   sudo systemctl enable nginx
   sudo systemctl start nginx
   sudo sed 's/7.2/$PHP_VERSION/g' /home/runner/work/appendix/artifacts/ui_nginx.conf

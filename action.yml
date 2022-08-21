@@ -185,7 +185,7 @@ runs:
       shell: bash
       run: /home/runner/work/appendix/scripts/bash/plugins/pluginTests.sh
       env:
-        TEST_SUITE: ${{ inputs.test-type }}
+        TEST_SUITE: ${{ inputs.test-command }}
         PLUGIN_NAME: ${{ inputs.plugin-name }}
 
       # running php or integration tests
