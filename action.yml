@@ -64,27 +64,33 @@ inputs:
     required: false
     default: "256M"
   redis-service:
-    type: boolen
+    type: choice
     description: "require reds services"
     required: false
-    default: false
+    options:
+      - true
+      - false
+      default: false
   mysql-service:
-    type: boolean
+    type: choice
     description: "require mysql services"
     required: false
+    options:
+      - true
+      - false
     default: true
 
 runs:
   using: "composite"
   steps:
     - name: start mysql services
-      if: inputs.mysql-service
+      if: inputs.mysql-service == 'true'
       shell: bash
       run: |
         docker run -d  --tmpfs /var/lib/mysql:rw --name mysql -p 3306:3306 -e ALLOW_EMPTY_PASSWORD=yes -e MYSQL_DATABASE=matomo_tests bitnami/mysql:5.7
 
     - name: start redis serivces
-      if: inputs.redis-service
+      if: inputs.redis-service == 'true'
       shell: bash
       run: |
         docker run -d --name redis -e ALLOW_EMPTY_PASSWORD=yes -p 6379:6379 bitnami/redis:latest
