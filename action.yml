@@ -115,13 +115,10 @@ runs:
 
     - name: Checkout code for pull request
       if: inputs.is-plugin != 'true'
-      uses: actions/checkout@v3
-      with:
-        repository: matomo-org/matomo
-        path: ./matomo
-        ref: ${{ inputs.git-sha }}
-        lfs: true
-        submodules: recursive
+      shell: bash
+      run: |
+         git clone --recurse-submodules https://github.com/matomo-org/matomo
+         git checkout ${{ inputs.git-sha }}
 
 
     - name: Checkout code
