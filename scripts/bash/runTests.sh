@@ -3,6 +3,8 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 SET='\033[0m'
 
+cd /home/runner/work/matomo/
+
 if [ "$TEST_SUITE" == 'PHP' ]
 then
     echo -e "${GREEN}Executing PHP Tests ...${SET}"
