@@ -49,7 +49,7 @@ fi
 
 
 # setup config
-sed "s/PDO\\\MYSQL/${MYSQL_ADAPTER}/g" /home/runner/work/appendix/artifacts/config.ini.github.php > config/config.ini.php
+sed "s/PDO_MYSQL/$MYSQL_ADAPTER/g" /home/runner/work/appendix/artifacts/config.ini.github.php > config/config.ini.php
 
 # setup js and phpunit.xml
 if [ "$MATOMO_TEST_TARGET" = "UI" ];
