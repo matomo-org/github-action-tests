@@ -5,6 +5,21 @@ GREEN='\033[0;32m'
 SET='\033[0m'
 
 
+echo -e "${GREEN} Checkout code for pull request${SET}"
+if [ "$PLUGIN_NAME" == '' ]
+then
+    echo -e "${GREEN} rm matomo folder${SET}"
+    sudo mv /home/runner/work/matomo /home/runner/work/old
+fi
+   cd /home/runner/work/
+   git clone --recurse-submodules https://github.com/matomo-org/matomo
+if [ "$PLUGIN_NAME" != '' ]
+then
+  cd plugins/$PLUGIN_NAME
+fi
+git fetch origin ${{ inputs.git-head }}
+it checkout ${{ inputs.git-sha }}
+
 # set up fonts
 if [ "$MATOMO_TEST_TARGET" = "UI" ];
 then
