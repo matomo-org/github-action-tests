@@ -17,7 +17,7 @@ if [ "$PLUGIN_NAME" != '' ]
 then
   cd plugins/$PLUGIN_NAME
 fi
-git checkout ${{ inputs.git-sha }}
+git checkout $SHA
 
 # set up fonts
 if [ "$MATOMO_TEST_TARGET" = "UI" ];
