@@ -28,7 +28,7 @@ then
         else
             ./console tests:run-ui --store-in-ui-tests-repo --persist-fixture-data --assume-artifacts --core --extra-options="$UITEST_EXTRA_OPTIONS"
         fi
-    elif [ "$TEST_SUITE" = "AllTests" ]
+    elif [ "$TEST_SUITE" = "All" ]
     then
         exit_code=0
 

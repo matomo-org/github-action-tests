@@ -11,7 +11,7 @@ inputs:
       - PluginTests
       - JS
       - Angular
-      - AllTests
+      - All
     default: PHP
   is-plugin:
     description: "if test is plugin or full test"
@@ -206,7 +206,7 @@ runs:
       shell: bash
       run: /home/runner/work/appendix/scripts/bash/pluginTests.sh
       env:
-        TEST_SUITE: ${{ inputs.test-command }}
+        TEST_SUITE: ${{ inputs.test-type }}
         PLUGIN_NAME: ${{ inputs.plugin-name }}
 
       # running main tests
@@ -240,7 +240,7 @@ runs:
           /home/runner/work/matomo/matomo/plugins/**/tests/System/processed/**
 
     - name: upload processed screenshots
-      if: failure() && inputs.test-type == 'UI'
+      if: failure() && (inputs.test-type == 'UI' || inputs.test-type == 'All')
       shell: bash
       run: /home/runner/work/appendix/scripts/bash/upload_artifacts.sh
       env:
@@ -251,7 +251,7 @@ runs:
         GITHUB_RUN_NUMBER: ${{ inputs.run_number }}
 
     - name: View UI failures
-      if: failure() && inputs.test-type == 'UI'
+      if: failure() && (inputs.test-type == 'UI' || inputs.test-type == 'All')
       shell: bash
       run: /home/runner/work/appendix/scripts/bash/view_ui_failed.sh
       env:
