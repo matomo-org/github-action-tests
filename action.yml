@@ -213,7 +213,7 @@ runs:
         GITHUB: true
       # system checks failed, upload expected xml and PDF
 
-    - name: upload artfact
+    - name: upload artifact
       if: failure() && inputs.test-type == 'PHP'
       uses: actions/upload-artifact@v3
       with:
@@ -221,7 +221,7 @@ runs:
         path: |
           /home/runner/work/matomo/matomo/plugins/**/tests/System/processed/**
 
-    - name: download artface
+    - name: download artifact
       if: failure() && inputs.test-type == 'PHP'
       uses: actions/download-artifact@v3
       with:
