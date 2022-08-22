@@ -149,6 +149,16 @@ runs:
         PLUGIN_NAME: ${{ inputs.plugin-name }}
         SHA: ${{  inputs.git-sha }}
 
+      # adding google woff
+    - name: set up google woff
+      if: inputs.test-command == 'IntegrationTestsCore'
+      shell: bash
+      run: |
+        cd /home/runner/work
+        git clone --recursive https://github.com/google/woff2.git ../travis_woff2
+        cd ../travis_woff2
+        make clean all
+
       # setting up ldap for plugin
     - name: Setup ldap
       if: inputs.addition == 'ldap'
