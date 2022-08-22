@@ -22,7 +22,7 @@ then
 fi
 
 # composer install
-cd /home/runner/work/matomo/matomo/
+cd /home/runner/work/matomo/
 echo -e "${GREEN}install composer${SET}"
 composer install --ignore-platform-reqs
 
@@ -41,10 +41,10 @@ sed "s/PDO\\\MYSQL/${MYSQL_ADAPTER}/g" /home/runner/work/appendix/artifacts/conf
 if [ "$MATOMO_TEST_TARGET" = "UI" ];
 then
   echo -e "${GREEN}installing node/puppeteer${SET}"
-  cd /home/runner/work/matomo/matomo/tests/lib/screenshot-testing
+  cd /home/runner/work/matomo/tests/lib/screenshot-testing
   git lfs pull --exclude=
   npm install
-  cd /home/runner/work/matomo/matomo/
+  cd /home/runner/work/matomo/
   cp ./tests/UI/config.dist.js ./tests/UI/config.js
   chmod a+rw ./tests/lib/geoip-files || true
   chmod a+rw ./plugins/*/tests/System/processed || true
@@ -58,17 +58,17 @@ fi
 if [ "$MATOMO_TEST_TARGET" = "JS" ] || [ "$MATOMO_TEST_TARGET" = "Angular" ];
 then
   echo -e "${GREEN}installing node/puppeteer${SET}"
-  cd /home/runner/work/matomo/matomo/tests/lib/screenshot-testing
+  cd /home/runner/work/matomo/tests/lib/screenshot-testing
   git lfs pull --exclude=
   npm install
-  cd /home/runner/work/matomo/matomo/
+  cd /home/runner/work/matomo/
   echo -e "${GREEN}start php on 80${SET}"
   sudo setcap CAP_NET_BIND_SERVICE=+eip $(readlink -f $(which php))
   tmux new-session -d -s "php-cgi" sudo php -S 127.0.0.1:80
   tmux ls
 else
   echo -e "${GREEN}setup php-fpm${SET}"
-  cd /home/runner/work/matomo/matomo/
+  cd /home/runner/work/matomo/
   sudo systemctl enable php$PHP_VERSION-fpm.service
   sudo systemctl start php$PHP_VERSION-fpm.service
   sudo sed 's/7.2/$PHP_VERSION/g' /home/runner/work/appendix/artifacts/www.conf
@@ -95,7 +95,7 @@ fi
 
 #make tmp folder
 echo -e "${GREEN}set up Folder${SET}"
-cd /home/runner/work/matomo/matomo/
+cd /home/runner/work/matomo/
 mkdir -p ./tmp/assets
 mkdir -p ./tmp/cache
 mkdir -p ./tmp/cache/tracker
@@ -112,11 +112,11 @@ mkdir -p /tmp
 
 #set up folder permission
 echo -e "${GREEN}set tmp and screenshot folder permission${SET}"
-cd /home/runner/work/matomo/matomo/
+cd /home/runner/work/matomo/
 sudo gpasswd -a "$USER" www-data
-sudo chown -R "$USER":www-data /home/runner/work/matomo/matomo/
-sudo chmod o+w /home/runner/work/matomo/matomo/
-sudo chmod -R 777 /home/runner/work/matomo/matomo/tmp
-sudo chmod -R 777 /home/runner/work/matomo/matomo/tmp/assets
-sudo chmod -R 777 /home/runner/work/matomo/matomo/tmp/templates_c
-sudo chmod -R 777 /home/runner/work/matomo/matomo/tests/UI
+sudo chown -R "$USER":www-data /home/runner/work/matomo/
+sudo chmod o+w /home/runner/work/matomo/
+sudo chmod -R 777 /home/runner/work/matomo/tmp
+sudo chmod -R 777 /home/runner/work/matomo/tmp/assets
+sudo chmod -R 777 /home/runner/work/matomo/tmp/templates_c
+sudo chmod -R 777 /home/runner/work/matomo/tests/UI
