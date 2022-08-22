@@ -158,7 +158,7 @@ runs:
       # setting up plugin tests
     - name: PluginTests Test runing
       if: inputs.plugin-name != ''
-      working-directory: /home/runner/work/matomo/
+      working-directory: /home/runner/work/matomo/matomo
       shell: bash
       run: /home/runner/work/appendix/scripts/bash/pluginTests.sh
       env:
@@ -168,7 +168,7 @@ runs:
       # running main tests
     - name: Test running
       if: inputs.plugin-name == ''
-      working-directory: /home/runner/work/matomo/
+      working-directory: /home/runner/work/matomo/matomo
       shell: bash
       run: /home/runner/work/appendix/scripts/bash/runTests.sh
       env:
@@ -186,7 +186,7 @@ runs:
       with:
         name: ${{ inputs.run_id }}
         path: |
-          /home/runner/work/matomo/plugins/**/tests/System/processed/**
+          /home/runner/work/matomo/matomo/plugins/**/tests/System/processed/**
 
     - name: download artface
       if: failure() && inputs.test-type == 'PHP'
@@ -194,7 +194,7 @@ runs:
       with:
         name: ${{ inputs.run_id }}
         path: |
-          /home/runner/work/matomo/plugins/**/tests/System/processed/**
+          /home/runner/work/matomo/matomo/plugins/**/tests/System/processed/**
 
     - name: upload processed screenshots
       if: failure() && (inputs.test-type == 'UI' || inputs.test-type == 'All')
