@@ -103,7 +103,9 @@ runs:
       shell: bash
       run: |
         cd /home/runner/work/
-        git clone https://github.com/matomo-org/github-action-tests.git appendix
+        git clone https://github.com/matomo-org/github-action-tests.git@v1 appendix
+        cd appendix
+        git checkout v1
 
       # setup php
     - name: Setup PHP
@@ -174,10 +176,11 @@ runs:
       # running main tests
     - name: Test running
       if: inputs.plugin-name == ''
+      working-directory: /home/runner/work/matomo/
       shell: bash
       run: /home/runner/work/appendix/scripts/bash/runTests.sh
       env:
-        TEST_SUITE: ${{ inputs.test-type }}
+        TEST_SUIT: ${{ inputs.test-type }}
         COMMAND: ${{ inputs.test-command }}
         TRAVIS: true
         GITHUB: true
