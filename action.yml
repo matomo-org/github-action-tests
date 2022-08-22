@@ -175,6 +175,7 @@ runs:
     - name: Test running
       if: inputs.plugin-name == ''
       shell: bash
+      working-directory: /home/runner/work/matomo/
       run: /home/runner/work/appendix/scripts/bash/runTests.sh
       env:
         TEST_SUITE: ${{ inputs.test-type }}
