@@ -19,7 +19,7 @@ fi
 if [ "$TEST_SUITE" == 'Angular' ]
 then
    echo -e "${GREEN}Executing JS Tests ...${SET}"
-   cd /home/runner/work/matomo/matomo/tests/angularjs
+   cd /home/runner/work/matomo/tests/angularjs
    npm install
   ./node_modules/karma/bin/karma start karma.conf.js --browsers ChromeHeadless --single-run
 fi
