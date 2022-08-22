@@ -120,28 +120,20 @@ runs:
          sudo mv /home/runner/work/matomo /home/runner/work/old
          cd /home/runner/work/
          git clone --recurse-submodules https://github.com/matomo-org/matomo
-         git checkout ${{ inputs.git-sha }}
+         git fetch origin ${{ inputs.git-head }}
+         it checkout ${{ inputs.git-sha }}
 
 
-    - name: Checkout code
-      if: inputs.is-plugin == 'true'
-      uses: actions/checkout@v3
-      with:
-        repository: matomo-org/matomo
-        path: ./matomo
-
-    - name: Move File to right place
-      if: inputs.is-plugin == 'true'
-      shell: bash
-      run: |
-        mkdir /home/runner/work/matomo
-        mv ./matomo /home/runner/work/matomo/
-        cd /home/runner/work/matomo/matomo
-        cd plugins/${{ inputs.plugin-name }}
-        git submodule update --init -- .
-        git fetch origin ${{ inputs.git-head }}
-        it checkout ${{ inputs.git-sha }}
-
+    - name: Checkout code for pull request
+        if: inputs.is-plugin == 'true'
+        shell: bash
+        run: |
+          sudo mv /home/runner/work/matomo /home/runner/work/old
+          cd /home/runner/work/
+          git clone --recurse-submodules https://github.com/matomo-org/matomo
+          cd plugins/${{ inputs.plugin-name }}
+          git fetch origin ${{ inputs.git-head }}
+          it checkout ${{ inputs.git-sha }}
 
       # setup php
     - name: Setup PHP
@@ -201,7 +193,7 @@ runs:
       # setting up plugin tests
     - name: PluginTests Test runing
       if: inputs.is-plugin == 'true'
-      working-directory: /home/runner/work/matomo/matomo
+      working-directory: /home/runner/work/matomo/
       shell: bash
       run: /home/runner/work/appendix/scripts/bash/pluginTests.sh
       env:
@@ -228,7 +220,7 @@ runs:
       with:
         name: ${{ inputs.run_id }}
         path: |
-          /home/runner/work/matomo/matomo/plugins/**/tests/System/processed/**
+          /home/runner/work/matomo/plugins/**/tests/System/processed/**
 
     - name: download artface
       if: failure() && inputs.test-type == 'PHP'
@@ -236,7 +228,7 @@ runs:
       with:
         name: ${{ inputs.run_id }}
         path: |
-          /home/runner/work/matomo/matomo/plugins/**/tests/System/processed/**
+          /home/runner/work/matomo/plugins/**/tests/System/processed/**
 
     - name: upload processed screenshots
       if: failure() && (inputs.test-type == 'UI' || inputs.test-type == 'All')
