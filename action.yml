@@ -117,23 +117,22 @@ runs:
       if: inputs.is-plugin != 'true'
       shell: bash
       run: |
-         sudo mv /home/runner/work/matomo /home/runner/work/old
-         cd /home/runner/work/
-         git clone --recurse-submodules https://github.com/matomo-org/matomo
-         git fetch origin ${{ inputs.git-head }}
-         it checkout ${{ inputs.git-sha }}
+        sudo mv /home/runner/work/matomo /home/runner/work/old
+        cd /home/runner/work/
+        git clone --recurse-submodules https://github.com/matomo-org/matomo
+        git fetch origin ${{ inputs.git-head }}
+        it checkout ${{ inputs.git-sha }}
 
 
     - name: Checkout code for pull request
-        if: inputs.is-plugin == 'true'
-        shell: bash
-        run: |
-          sudo mv /home/runner/work/matomo /home/runner/work/old
-          cd /home/runner/work/
-          git clone --recurse-submodules https://github.com/matomo-org/matomo
-          cd plugins/${{ inputs.plugin-name }}
-          git fetch origin ${{ inputs.git-head }}
-          it checkout ${{ inputs.git-sha }}
+      if: inputs.is-plugin == 'true'
+      shell: bash
+      run: |
+        cd /home/runner/work/
+        git clone --recurse-submodules https://github.com/matomo-org/matomo
+        cd plugins/${{ inputs.plugin-name }}
+        git fetch origin ${{ inputs.git-head }}
+        it checkout ${{ inputs.git-sha }}
 
       # setup php
     - name: Setup PHP
