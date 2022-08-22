@@ -11,6 +11,15 @@ inputs:
       - PluginTests
       - JS
       - Angular
+      - AllTests
+    default: PHP
+  is-plugin:
+    description: "if test is plugin or full test"
+    type: choice
+    options:
+      - true
+      - false
+    default: false
   git-head:
     description: "head"
     required: true
@@ -105,7 +114,7 @@ runs:
 
 
     - name: Checkout code for pull request
-      if: inputs.test-command != 'PluginTests'
+      if: inputs.is-plugin != 'true'
       uses: actions/checkout@v3
       with:
         repository: matomo-org/matomo
@@ -116,29 +125,23 @@ runs:
 
 
     - name: Checkout code
-      if: inputs.test-command == 'PluginTests'
+      if: inputs.is-plugin == 'true'
       uses: actions/checkout@v3
       with:
         repository: matomo-org/matomo
         path: ./matomo
 
     - name: Move File to right place
-      if: inputs.test-command == 'PluginTests'
+      if: inputs.is-plugin == 'true'
       shell: bash
       run: |
         mkdir /home/runner/work/matomo
         mv ./matomo /home/runner/work/matomo/
-        ls -l /home/runner/work/appendix
-
-    - name: Checkout Submodule to current Pull request
-      if: inputs.test-command == 'PluginTests'
-      shell: bash
-      working-directory: /home/runner/work/matomo/matomo
-      run: |
+        cd /home/runner/work/matomo/matomo
         cd plugins/${{ inputs.plugin-name }}
         git submodule update --init -- .
         git fetch origin ${{ inputs.git-head }}
-        git checkout ${{ inputs.git-sha }}
+        it checkout ${{ inputs.git-sha }}
 
 
       # setup php
@@ -198,21 +201,22 @@ runs:
 
       # setting up plugin tests
     - name: PluginTests Test runing
-      if: inputs.test-command == 'PluginTests'
+      if: inputs.is-plugin == 'true'
       working-directory: /home/runner/work/matomo/matomo
       shell: bash
-      run: /home/runner/work/appendix/scripts/bash/plugins/pluginTests.sh
+      run: /home/runner/work/appendix/scripts/bash/pluginTests.sh
       env:
-        TEST_SUITE: ${{ inputs.test-type }}
+        TEST_SUITE: ${{ inputs.test-command }}
         PLUGIN_NAME: ${{ inputs.plugin-name }}
 
-      # running php or integration tests
+      # running main tests
     - name: Test running
-      if: inputs.test-type == 'PHP'
+      if: inputs.is-plugin != 'true'
       shell: bash
-      run: |
-        ./vendor/phpunit/phpunit/phpunit --configuration ./tests/PHPUnit/phpunit.xml --testsuite ${{ inputs.test-command }}
+      run: /home/runner/work/appendix/scripts/bash/runTests.sh
       env:
+        TEST_SUITE: ${{ inputs.test-type }}
+        COMMAND: ${{ inputs.test-command }}
         TRAVIS: true
         GITHUB: true
         PHP_VERSION: ${{ inputs.php-version }}
@@ -235,15 +239,6 @@ runs:
         path: |
           /home/runner/work/matomo/matomo/plugins/**/tests/System/processed/**
 
-
-    - name: UI tests Group ${{ matrix.parts }}
-      if: inputs.test-type == 'UI'
-      shell: bash
-      env:
-        GITHUB: true
-      run: |
-        ./console tests:run-ui --store-in-ui-tests-repo --persist-fixture-data --assume-artifacts --core --extra-options="--num-test-groups=8 --test-group=${{ inputs.test-command }}"
-
     - name: upload processed screenshots
       if: failure() && inputs.test-type == 'UI'
       shell: bash
@@ -263,17 +258,3 @@ runs:
         GITHUB_REPO: ${{ inputs.repository }}
         GITHUB_BRANCH: ${{ inputs.ref }}
         GITHUB_RUN_ID: ${{ inputs.run_id }}
-
-    - name: Running angularjs && vue tests
-      if: inputs.test-type == 'Angular'
-      shell: bash
-      working-directory: ./tests/angularjs
-      run: |
-        npm install
-        ./node_modules/karma/bin/karma start karma.conf.js --browsers ChromeHeadless --single-run
-
-    - name: Javascript Tests
-      if: inputs.test-type == 'JS'
-      shell: bash
-      run: |
-        ./console tests:run-js --matomo-url='http://localhost'

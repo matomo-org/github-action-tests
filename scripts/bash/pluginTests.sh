@@ -11,13 +11,13 @@ then
         echo -e "${GREEN}[ plugin name = $PLUGIN_NAME ]${SET}"
     fi
 
-    if [ "$TEST_SUITE" = "AngularJSTests" ]
+    if [ "$TEST_SUITE" = "Angular" ]
     then
      echo -e "${GREEN}Running angularjs tests${SET}"
      ./node_modules/karma/bin/karma start karma.conf.js --browsers ChromeHeadless --single-run
      echo -e "${GREEN}Running vue tests${SET}"
      npm test
-    elif [ "$TEST_SUITE" = "JavascriptTests" ]
+    elif [ "$TEST_SUITE" = "JS" ]
     then
       ./console tests:run-js --matomo-url='http://localhost'
     elif [ "$TEST_SUITE" = "UI" ]
