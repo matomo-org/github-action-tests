@@ -195,7 +195,7 @@ runs:
       working-directory: /home/runner/work/matomo/matomo
       shell: bash
       run: |
-        cd /home/runner/work/matomo/tests/angularjs
+        cd /home/runner/work/matomo/matomo/tests/angularjs
         npm install
         ./node_modules/karma/bin/karma start karma.conf.js --browsers ChromeHeadless --single-run
       env:
