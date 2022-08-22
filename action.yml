@@ -103,7 +103,7 @@ runs:
       shell: bash
       run: |
         cd /home/runner/work/
-        git clone https://github.com/matomo-org/github-action-tests.git@v1 appendix
+        git clone https://github.com/matomo-org/github-action-tests.git appendix
         cd appendix
         git checkout v1
 
