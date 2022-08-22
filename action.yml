@@ -117,7 +117,7 @@ runs:
       if: inputs.is-plugin != 'true'
       shell: bash
       run: |
-         git clone --recurse-submodules https://github.com/matomo-org/matomo
+         git clone --recurse-submodules https://github.com/matomo-org/matomo ./matomo
          git checkout ${{ inputs.git-sha }}
 
 
