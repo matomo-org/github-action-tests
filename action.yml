@@ -151,7 +151,7 @@ runs:
 
       # adding google woff
     - name: Setup google woff
-      if: inputs.test-command = 'IntegrationTestsCore'
+      if: inputs.test-command == 'IntegrationTestsCore'
       shell: bash
       run: |
         cd /home/runner/work
