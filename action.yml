@@ -147,6 +147,7 @@ runs:
         MYSQL_ADAPTER: ${{ inputs.mysql-driver }}
         ADDITION: ${{ inputs.addition }}
         PLUGIN_NAME: ${{ inputs.plugin-name }}
+        SHA: ${{  inputs.git-sha }}
 
       # adding google woff
     - name: set up google woff
