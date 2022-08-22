@@ -17,8 +17,7 @@ if [ "$PLUGIN_NAME" != '' ]
 then
   cd plugins/$PLUGIN_NAME
 fi
-git fetch origin ${{ inputs.git-head }}
-it checkout ${{ inputs.git-sha }}
+git checkout ${{ inputs.git-sha }}
 
 # set up fonts
 if [ "$MATOMO_TEST_TARGET" = "UI" ];
