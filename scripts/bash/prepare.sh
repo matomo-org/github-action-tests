@@ -13,6 +13,7 @@ then
 fi
    cd /home/runner/work/matomo
    git clone --recurse-submodules https://github.com/matomo-org/matomo
+   cd /home/runner/work/matomo/matomo
 if [ "$PLUGIN_NAME" != '' ]
 then
   cd plugins/$PLUGIN_NAME
