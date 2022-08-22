@@ -166,20 +166,53 @@ runs:
         PLUGIN_NAME: ${{ inputs.plugin-name }}
 
       # running main tests
-    - name: Test running
-      if: inputs.plugin-name == ''
+    - name: Test PHP running
+      if: inputs.plugin-name == '' && inputs.test-type == 'PHP'
       working-directory: /home/runner/work/matomo/matomo
       shell: bash
-      run: /home/runner/work/appendix/scripts/bash/runTests.sh
+      run: |
+        ./vendor/phpunit/phpunit/phpunit --configuration ./tests/PHPUnit/phpunit.xml --testsuite ${{ inputs.test-command }}
       env:
-        TEST_SUIT: ${{ inputs.test-type }}
-        COMMAND: ${{ inputs.test-command }}
         TRAVIS: true
         GITHUB: true
         PHP_VERSION: ${{ inputs.php-version }}
         MYSQL_ADAPTER: ${{ inputs.mysql-driver }}
 
+    - name: Test JS running
+      if: inputs.plugin-name == '' && inputs.test-type == 'JS'
+      working-directory: /home/runner/work/matomo/matomo
+      shell: bash
+      run: |
+        ./console tests:run-js --matomo-url='http://localhost'
+      env:
+        TRAVIS: true
+        GITHUB: true
+        PHP_VERSION: ${{ inputs.php-version }}
+        MYSQL_ADAPTER: ${{ inputs.mysql-driver }}
+
+    - name: Test Angular running
+      if: inputs.plugin-name == '' && inputs.test-type == 'Angular'
+      working-directory: /home/runner/work/matomo/matomo
+      shell: bash
+      run: |
+        cd /home/runner/work/matomo/tests/angularjs
+        npm install
+        ./node_modules/karma/bin/karma start karma.conf.js --browsers ChromeHeadless --single-run
+      env:
+        TRAVIS: true
+        GITHUB: true
+
+    - name: Test UI running
+      if: inputs.plugin-name == '' && inputs.test-type == 'UI'
+      working-directory: /home/runner/work/matomo/matomo
+      shell: bash
+      run: |
+        ./console tests:run-ui --store-in-ui-tests-repo --persist-fixture-data --assume-artifacts --core --extra-options="--num-test-groups=8 --test-group=${{ inputs.test-command }}"
+      env:
+        TRAVIS: true
+        GITHUB: true
       # system checks failed, upload expected xml and PDF
+
     - name: upload artfact
       if: failure() && inputs.test-type == 'PHP'
       uses: actions/upload-artifact@v3
