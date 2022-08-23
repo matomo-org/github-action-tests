@@ -5,6 +5,16 @@ GREEN='\033[0;32m'
 SET='\033[0m'
 
 
+echo -e "${GREEN} Install woff2${SET}"
+if[ "$COMMAND" == 'IntegrationTestsCore' ]
+then
+ cd /home/runner/work
+ git clone --recursive https://github.com/google/woff2.git ../travis_woff2
+ cd ../travis_woff2
+ make clean all
+fi
+
+
 echo -e "${GREEN} Checkout code for pull request${SET}"
 if [ "$PLUGIN_NAME" == '' ]
 then
