@@ -23,6 +23,7 @@ fi
 if [ "$PLUGIN_NAME" != '' ]
 then
    sudo mkdir /home/runner/work/matomo/
+   sudo chown -R "$USER":www-data /home/runner/work/matomo/
 fi
    cd /home/runner/work/matomo
    git clone --recurse-submodules https://github.com/matomo-org/matomo
@@ -51,8 +52,7 @@ then
 
 fi
 
-sudo chown -R "$USER":www-data /home/runner/work/matomo/matomo/
-sudo chmod o+w /home/runner/work/matomo/matomo/
+
 # composer install
 cd /home/runner/work/matomo/matomo/
 echo -e "${GREEN}install composer${SET}"
@@ -144,9 +144,10 @@ mkdir -p /tmp
 
 #set up folder permission
 echo -e "${GREEN}set tmp and screenshot folder permission${SET}"
+sudo chown -R "$USER":www-data /home/runner/work/matomo/matomo/
+sudo chmod o+w /home/runner/work/matomo/matomo/
 cd /home/runner/work/matomo/matomo/
 sudo gpasswd -a "$USER" www-data
-
 sudo chmod -R 777 /home/runner/work/matomo/matomo/tmp
 sudo chmod -R 777 /home/runner/work/matomo/matomo/tmp/assets
 sudo chmod -R 777 /home/runner/work/matomo/matomo/tmp/templates_c
