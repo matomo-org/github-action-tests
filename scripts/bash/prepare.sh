@@ -34,7 +34,6 @@ fi
 git fetch
 git checkout $SHA
 
-cd /home/runner/work/matomo/matomo
 
 # set up fonts
 if [ "$MATOMO_TEST_TARGET" = "UI" ];
@@ -52,6 +51,8 @@ then
 
 fi
 
+sudo chown -R "$USER":www-data /home/runner/work/matomo/matomo/
+sudo chmod o+w /home/runner/work/matomo/matomo/
 # composer install
 cd /home/runner/work/matomo/matomo/
 echo -e "${GREEN}install composer${SET}"
@@ -145,8 +146,7 @@ mkdir -p /tmp
 echo -e "${GREEN}set tmp and screenshot folder permission${SET}"
 cd /home/runner/work/matomo/matomo/
 sudo gpasswd -a "$USER" www-data
-sudo chown -R "$USER":www-data /home/runner/work/matomo/matomo/
-sudo chmod o+w /home/runner/work/matomo/matomo/
+
 sudo chmod -R 777 /home/runner/work/matomo/matomo/tmp
 sudo chmod -R 777 /home/runner/work/matomo/matomo/tmp/assets
 sudo chmod -R 777 /home/runner/work/matomo/matomo/tmp/templates_c
