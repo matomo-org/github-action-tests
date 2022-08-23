@@ -34,6 +34,8 @@ fi
 git fetch
 git checkout $SHA
 
+cd /home/runner/work/matomo/matomo
+
 # set up fonts
 if [ "$MATOMO_TEST_TARGET" = "UI" ];
 then
