@@ -20,6 +20,10 @@ then
     echo -e "${GREEN} rm matomo folder${SET}"
     sudo rm /home/runner/work/matomo/*
 fi
+if [ "$PLUGIN_NAME" != '' ]
+then
+   sudo mkdir /home/runner/work/matomo/
+fi
    cd /home/runner/work/matomo
    git clone --recurse-submodules https://github.com/matomo-org/matomo
    cd /home/runner/work/matomo/matomo
