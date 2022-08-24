@@ -34,13 +34,15 @@ then
    git fetch
    git checkout $TARGET
 fi
-   git submodule update --init --recursive
 if [ "$PLUGIN_NAME" != '' ]
 then
   cd plugins/$PLUGIN_NAME
 fi
 git fetch
 git checkout $SHA
+cd /home/runner/work/matomo/matomo
+git submodule update --init --recursive
+
 
 
 # set up fonts
