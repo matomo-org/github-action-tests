@@ -31,8 +31,8 @@ inputs:
   artifect_pass:
     description: "UI upload passs"
     required: false
-  ref:
-    description: "Pull request ref"
+  test-target:
+    description: "Matomo branch/tag test against"
     required: false
   plugin-name:
     description: "name"
@@ -149,6 +149,7 @@ runs:
         PLUGIN_NAME: ${{ inputs.plugin-name }}
         SHA: ${{ inputs.git-sha }}
         COMMAND: ${{ inputs.test-command }}
+        TARGET: ${{ inputs.test-target }}}
 
       # setting up ldap for plugin
     - name: Setup ldap

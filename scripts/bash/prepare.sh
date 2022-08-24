@@ -28,6 +28,13 @@ fi
    cd /home/runner/work/matomo
    git clone --recurse-submodules https://github.com/matomo-org/matomo
    cd /home/runner/work/matomo/matomo
+
+if [-n "$TARGET" ]
+then
+   git fetch
+   git checkout $TARGET
+fi
+   git submodule update --init --recursive
 if [ "$PLUGIN_NAME" != '' ]
 then
   cd plugins/$PLUGIN_NAME
