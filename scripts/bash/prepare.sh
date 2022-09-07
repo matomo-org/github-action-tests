@@ -18,7 +18,7 @@ echo -e "${GREEN} Checkout code for pull request${SET}"
 if [ "$PLUGIN_NAME" == '' ]
 then
     echo -e "${GREEN} rm matomo folder${SET}"
-    sudo rm /home/runner/work/matomo/*
+    sudo rm -r /home/runner/work/matomo/*
 fi
 if [ "$PLUGIN_NAME" != '' ]
 then
@@ -29,7 +29,7 @@ fi
    git clone --recurse-submodules https://github.com/matomo-org/matomo
    cd /home/runner/work/matomo/matomo
 
-if [-n "$TARGET" ]
+if [ -n "$TARGET" ]
 then
    git fetch
    git checkout $TARGET
