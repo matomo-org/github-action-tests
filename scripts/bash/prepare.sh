@@ -32,7 +32,7 @@ fi
 if [ -n "$TARGET" ]
 then
    git fetch
-   git checkout $TARGET
+   git switch $TARGET
 fi
 if [ "$PLUGIN_NAME" != '' ]
 then
