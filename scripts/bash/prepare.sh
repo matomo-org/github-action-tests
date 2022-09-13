@@ -8,7 +8,7 @@ SET='\033[0m'
 if [ "$COMMAND" == 'IntegrationTestsCore' ]
 then
  echo -e "${GREEN} Install woff2${SET}"
- cd /home/runner/work/matomo/matomo
+ cd /home/runner/work/matomo/
  git clone --recursive https://github.com/google/woff2.git ../travis_woff2
  cd ../travis_woff2
  make clean all
