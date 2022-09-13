@@ -16,9 +16,6 @@ inputs:
   git-head:
     description: "head"
     required: true
-  git-sha:
-    description: "sha"
-    required: true
   run_id:
     description: "GitHub Run Id"
     required: false
@@ -147,7 +144,6 @@ runs:
         MYSQL_ADAPTER: ${{ inputs.mysql-driver }}
         ADDITION: ${{ inputs.addition }}
         PLUGIN_NAME: ${{ inputs.plugin-name }}
-        SHA: ${{ inputs.git-sha }}
         COMMAND: ${{ inputs.test-command }}
         TARGET: ${{ inputs.test-target }}
 
