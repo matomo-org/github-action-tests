@@ -149,7 +149,7 @@ runs:
         PLUGIN_NAME: ${{ inputs.plugin-name }}
         SHA: ${{ inputs.git-sha }}
         COMMAND: ${{ inputs.test-command }}
-        TARGET: ${{ inputs.test-target }}}
+        TARGET: ${{ inputs.test-target }}
 
       # setting up ldap for plugin
     - name: Setup ldap
