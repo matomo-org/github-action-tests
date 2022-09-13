@@ -38,8 +38,7 @@ if [ "$PLUGIN_NAME" != '' ]
 then
   cd plugins/$PLUGIN_NAME
 fi
-git fetch
-git checkout $SHA
+git reset --hard $SHA
 cd /home/runner/work/matomo/matomo
 git submodule update --init --recursive
 
