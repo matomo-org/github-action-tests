@@ -28,9 +28,6 @@ inputs:
   artifect_pass:
     description: "UI upload passs"
     required: false
-  test-target:
-    description: "Matomo branch/tag test against"
-    required: false
   plugin-name:
     description: "name"
     required: false
@@ -244,5 +241,5 @@ runs:
       run: /home/runner/work/appendix/scripts/bash/view_ui_failed.sh
       env:
         GITHUB_REPO: ${{ inputs.repository }}
-        GITHUB_BRANCH: ${{ inputs.test-target }}
+        GITHUB_BRANCH: ${{ inputs.git-head }}
         GITHUB_RUN_ID: ${{ inputs.run_id }}
