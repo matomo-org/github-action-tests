@@ -8,10 +8,8 @@ SET='\033[0m'
 if [ "$COMMAND" == 'IntegrationTestsCore' ]
 then
  echo -e "${GREEN} Install woff2${SET}"
- cd /home/runner/work/matomo/
- git clone --recursive https://github.com/google/woff2.git travis_woff2
- cd travis_woff2
- make clean all
+ sudo apt-get install -y woff2
+ woff2_compress
 fi
 
 echo -e "${GREEN} Checkout code for pull request${SET}"
