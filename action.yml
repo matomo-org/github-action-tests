@@ -16,16 +16,16 @@ inputs:
   git-head:
     description: "head"
     required: true
-  run_id:
+  run-id:
     description: "GitHub Run Id"
     required: false
   repository:
     description: "GitHub repository"
     required: false
-  run_number:
+  run-number:
     description: "GitHub run number"
     required: false
-  artifect_pass:
+  artifect-pass:
     description: "UI upload passs"
     required: false
   plugin-name:
@@ -76,6 +76,9 @@ inputs:
       - true
       - false
     default: true
+  merge-target:
+    description: "merge target used for UI viewer"
+    default: ''
 
 runs:
   using: "composite"
@@ -96,6 +99,7 @@ runs:
     - name: Checkout code
       shell: bash
       run: |
+        git config --global advice.detachedHead false
         cd /home/runner/work/
         git clone https://github.com/matomo-org/github-action-tests.git appendix
         cd appendix
@@ -231,7 +235,7 @@ runs:
       env:
         ARTIFACTS_PASS: ${{ inputs.artifect_pass }}
         GITHUB_REPO: ${{ inputs.repository }}
-        GITHUB_BRANCH: ${{ inputs.test-target }}
+        GITHUB_BRANCH: ${{ inputs.merge-target }}
         GITHUB_RUN_ID: ${{ inputs.run_id }}
         GITHUB_RUN_NUMBER: ${{ inputs.run_number }}
 
@@ -241,5 +245,5 @@ runs:
       run: /home/runner/work/appendix/scripts/bash/view_ui_failed.sh
       env:
         GITHUB_REPO: ${{ inputs.repository }}
-        GITHUB_BRANCH: ${{ inputs.git-head }}
+        GITHUB_BRANCH: ${{ inputs.merge-target }}
         GITHUB_RUN_ID: ${{ inputs.run_id }}
