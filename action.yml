@@ -123,7 +123,6 @@ runs:
           allow_url_fopen=on,
           zend.exception_ignore_args=Off
           mysqli.allow_local_infile=On
-          opcache.enable=1
           opcache.enable_cli=1
         tools: composer:v2
         coverage: none
