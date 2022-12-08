@@ -27,10 +27,10 @@ fi
    git clone --recurse-submodules https://github.com/matomo-org/matomo
    cd /home/runner/work/matomo/matomo
 
-if [ -n "$TARGET" ]
+if [ -n "$REF" ]
 then
-   git fetch
-   git switch $TARGET
+   git fetch origin $REF:newbranch
+   git checkout -b current newbranch
 fi
 if [ "$PLUGIN_NAME" != '' ]
 then

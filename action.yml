@@ -13,8 +13,8 @@ inputs:
       - Angular
       - All
     default: PHP
-  git-head:
-    description: "head"
+  git-ref:
+    description: "ref"
     required: true
   run-id:
     description: "GitHub Run Id"
@@ -145,7 +145,7 @@ runs:
         ADDITION: ${{ inputs.addition }}
         PLUGIN_NAME: ${{ inputs.plugin-name }}
         COMMAND: ${{ inputs.test-command }}
-        TARGET: ${{ inputs.git-head }}
+        REF: ${{ inputs.git-ref }}
 
       # setting up ldap for plugin
     - name: Setup ldap
