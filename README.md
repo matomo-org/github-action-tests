@@ -36,6 +36,5 @@ jobs:
         uses: matomo-org/github-action-tests@v1
         with:
           git-head: ${{ github.head_ref }}
-          git-sha: ${{ github.event.pull_request.head.sha }}
           plugin-name: 'TasksTimetable'
 ```
