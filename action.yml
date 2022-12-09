@@ -25,7 +25,7 @@ inputs:
   run-number:
     description: "GitHub run number"
     required: false
-  artifect-pass:
+  artifact-pass:
     description: "UI upload passs"
     required: false
   plugin-name:
