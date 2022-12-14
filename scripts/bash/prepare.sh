@@ -57,7 +57,6 @@ then
 
 fi
 
-
 # composer install
 cd /home/runner/work/matomo/matomo/
 echo -e "${GREEN}install composer${SET}"
@@ -69,7 +68,6 @@ then
   composer remove --dev phpunit/phpunit
   composer require --dev phpunit/phpunit ~9.3 --ignore-platform-reqs
 fi
-
 
 # setup config
 sed "s/PDO_MYSQL/$MYSQL_ADAPTER/g" /home/runner/work/appendix/artifacts/config.ini.github.php > config/config.ini.php
