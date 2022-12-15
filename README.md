@@ -1,12 +1,12 @@
-### Matomo Plugin Github Action Tests Package
+### Matomo Plugin GitHub Action Tests Package
 
-This is the package for the matomo test, service still need enter before the job. 
+This is a group of the scripts for the Matomo Tests
 
 ### Inputs
 
 `test-type` UI,PHP(Integration,System) PluginTests,JS, Angular (This will be renamed to VUE)
 
-`git-sha` Pull request sha to test
+`git-ref` Git Ref to test
 
 `run_id` GitHub Action run ID, unique id that used to download artifact
 
@@ -35,6 +35,6 @@ jobs:
       - name: run tests
         uses: matomo-org/github-action-tests@v1
         with:
-          git-head: ${{ github.head_ref }}
+          git-ref: ${{ github.ref }}
           plugin-name: 'TasksTimetable'
 ```
