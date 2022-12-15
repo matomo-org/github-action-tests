@@ -5,13 +5,6 @@ GREEN='\033[0;32m'
 SET='\033[0m'
 
 
-if [ "$COMMAND" == 'IntegrationTestsCore' ]
-then
- echo -e "${GREEN} Install woff2${SET}"
- sudo apt-get install -y woff2
- woff2_compress
-fi
-
 echo -e "${GREEN} Checkout code for pull request${SET}"
 if [ "$PLUGIN_NAME" == '' ]
 then
