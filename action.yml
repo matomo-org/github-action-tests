@@ -201,7 +201,7 @@ runs:
       # system checks failed, upload expected xml and PDF
 
     - name: upload processed screenshots
-      if: failure() && (inputs.test-type == 'UI' || inputs.test-type == 'All')
+      if: failure() && (inputs.test-type == 'UI' || inputs.test-type == 'All' || inputs.test-type == 'PluginTests')
       shell: bash
       run: /home/runner/work/appendix/scripts/bash/upload_artifacts.sh
       env:
@@ -212,7 +212,7 @@ runs:
         GITHUB_RUN_NUMBER: ${{ inputs.run_number }}
 
     - name: View UI failures
-      if: failure() && (inputs.test-type == 'UI' || inputs.test-type == 'All')
+      if: failure() && (inputs.test-type == 'UI' || inputs.test-type == 'All' || inputs.test-type == 'PluginTests')
       shell: bash
       run: /home/runner/work/appendix/scripts/bash/view_ui_failed.sh
       env:
