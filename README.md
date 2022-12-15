@@ -8,7 +8,7 @@ This is a group of the scripts for the Matomo Tests
 
 `git-ref` Git Ref to test
 
-`run_id` GitHub Action run ID, unique id that used to download artifact
+`run-number` GitHub Action run ID, unique id that used to download artifact
 
 `redis-service` if test request redis
 
@@ -23,6 +23,15 @@ This is a group of the scripts for the Matomo Tests
 `php-extensions` `string` optional see here for more detail https://github.com/shivammathur/setup-php
 
 `addition` if test required eg: ldap
+
+`test-command:` the command used to run the tests
+
+`php-memory` If you like to increase or decrease the PHP memory, default 256M.
+
+`artifact-pass` use for UI viewer, artifact password
+
+
+``
 
 ### Usage For Plugin
 ```yaml

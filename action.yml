@@ -53,9 +53,6 @@ inputs:
     description: 'additional test or setup'
     required: false
     default: ''
-  secrets:
-    description: ''
-    required: false
   php-memory:
     description: "php memory limit"
     required: false
@@ -76,9 +73,7 @@ inputs:
       - true
       - false
     default: true
-  merge-target:
-    description: "merge target used for UI viewer"
-    default: ''
+
 
 runs:
   using: "composite"
