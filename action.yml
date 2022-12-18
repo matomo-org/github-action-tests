@@ -208,7 +208,7 @@ runs:
         ARTIFACTS_PASS: ${{ inputs.artifect_pass }}
         GITHUB_REPO: ${{ inputs.repository }}
         GITHUB_BRANCH: ${{ inputs.merge-target }}
-        GITHUB_run-id: ${{ inputs.run-id }}
+        GITHUB_RUN_ID: ${{ inputs.run-id }}
         GITHUB_RUN_NUMBER: ${{ inputs.run_number }}
 
     - name: View UI failures
