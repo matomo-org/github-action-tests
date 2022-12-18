@@ -218,4 +218,4 @@ runs:
       env:
         GITHUB_REPO: ${{ inputs.repository }}
         GITHUB_BRANCH: ${{ inputs.merge-target }}
-        GITHUB_run-id: ${{ inputs.run-id }}
+        GITHUB_RUN_ID: ${{ inputs.run-id }}
