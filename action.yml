@@ -39,7 +39,13 @@ inputs:
       - MYSQLI
     default: 'PDO_MYSQL'
   test-command:
-    description: "Test name"
+    description: "Test name to run the tests"
+    options:
+      - UnitTests
+      - SystemTestsPlugins
+      - SystemTestsCore
+      - IntegrationTestsCore
+      - IntegrationTestsPlugins
     required: false
   php-version:
     description: '7.2-8.1'
@@ -205,11 +211,11 @@ runs:
       shell: bash
       run: /home/runner/work/appendix/scripts/bash/upload_artifacts.sh
       env:
-        ARTIFACTS_PASS: ${{ inputs.artifect_pass }}
+        ARTIFACTS_PASS: ${{ inputs.artifect-pass }}
         GITHUB_REPO: ${{ inputs.repository }}
         GITHUB_BRANCH: ${{ inputs.merge-target }}
         GITHUB_RUN_ID: ${{ inputs.run-id }}
-        GITHUB_RUN_NUMBER: ${{ inputs.run_number }}
+        GITHUB_RUN_NUMBER: ${{ inputs.run-number }}
 
     - name: View UI failures
       if: failure() && (inputs.test-type == 'UI' || inputs.test-type == 'All' || inputs.test-type == 'PluginTests')

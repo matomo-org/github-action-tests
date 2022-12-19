@@ -4,8 +4,7 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 SET='\033[0m'
 
-
-echo -e "${GREEN} Checkout code for pull request${SET}"
+echo -e "${GREEN} Prepare directory ${SET}"
 if [ "$PLUGIN_NAME" == '' ]
 then
     echo -e "${GREEN} rm matomo folder${SET}"
@@ -16,23 +15,25 @@ then
    sudo mkdir /home/runner/work/matomo/
    sudo chown -R "$USER":www-data /home/runner/work/matomo/
 fi
-   cd /home/runner/work/matomo
-   git clone --recurse-submodules https://github.com/matomo-org/matomo
-   cd /home/runner/work/matomo/matomo
 
+echo -e "${GREEN} Clone repo${SET}"
+cd /home/runner/work/matomo
+git clone --recurse-submodules https://github.com/matomo-org/matomo
+cd /home/runner/work/matomo/matomo
+
+if [ "$PLUGIN_NAME" != '' ]
+then
+  echo -e "${GREEN} Switch to plugin ${$PLUGIN_NAME} DIR ${SET}"
+  cd plugins/$PLUGIN_NAME
+fi
 if [ -n "$REF" ]
 then
+   echo -e "${GREEN} Checkout ${REF} branch ${SET}"
    git fetch origin $REF:newbranch
    git checkout -b current newbranch
 fi
-if [ "$PLUGIN_NAME" != '' ]
-then
-  cd plugins/$PLUGIN_NAME
-fi
 cd /home/runner/work/matomo/matomo
 git submodule update --init --recursive
-
-
 
 # set up fonts
 if [ "$MATOMO_TEST_TARGET" = "UI" ];
@@ -99,13 +100,13 @@ else
   cd /home/runner/work/matomo/matomo/
   sudo systemctl enable php$PHP_VERSION-fpm.service
   sudo systemctl start php$PHP_VERSION-fpm.service
-  sudo sed 's/7.2/$PHP_VERSION/g' /home/runner/work/appendix/artifacts/www.conf
+  sudo sed 's/VersionNumber/$PHP_VERSION/g' /home/runner/work/appendix/artifacts/www.conf
   sudo cp /home/runner/work/appendix/artifacts/www.conf  /etc/php/$PHP_VERSION/fpm/pool.d/
   sudo systemctl reload php$PHP_VERSION-fpm.service
   sudo systemctl restart php$PHP_VERSION-fpm.service
   sudo systemctl enable nginx
   sudo systemctl start nginx
-  sudo sed 's/7.2/$PHP_VERSION/g' /home/runner/work/appendix/artifacts/ui_nginx.conf
+  sudo sed 's/VersionNumber/$PHP_VERSION/g' /home/runner/work/appendix/artifacts/ui_nginx.conf
   sudo cp  /home/runner/work/appendix/artifacts/ui_nginx.conf /etc/nginx/conf.d/
   sudo unlink /etc/nginx/sites-enabled/default
   sudo systemctl reload nginx
