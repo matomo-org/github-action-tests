@@ -1,6 +1,8 @@
 ### Matomo Plugin GitHub Action Tests Package
 
-This is a group of the scripts for the Matomo Tests
+This is a group of the scripts for the Matomo Tests. Used to run Matomo Core or Plugin tests.
+
+The Package include webserver, mysql, PHP setting up. You can also change the inputs below to adapters different tests between environments.
 
 ### Inputs
 
@@ -28,7 +30,7 @@ This is a group of the scripts for the Matomo Tests
 
 `php-memory` If you like to increase or decrease the PHP memory, default 256M.
 
-`artifact-pass` use for UI viewer, artifact password
+`artifact-pass` use for UI viewer, always use a repository secret for this.
 
 
 ``
