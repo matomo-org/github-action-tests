@@ -1,7 +1,5 @@
 #!/bin/bash
 
-cd /home/runner/work
-ls -l
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
