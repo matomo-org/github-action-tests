@@ -79,6 +79,9 @@ inputs:
       - true
       - false
     default: true
+  workspace:
+    required: false
+    description: "when the repo is private repo different from plugin name"
 
 
 runs:
@@ -147,6 +150,7 @@ runs:
         PLUGIN_NAME: ${{ inputs.plugin-name }}
         COMMAND: ${{ inputs.test-command }}
         REF: ${{ inputs.git-ref }}
+        WORKSPACE: ${{ inputs.workspace }}
 
       # setting up plugin tests
     - name: PluginTests Test runing
