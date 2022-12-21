@@ -27,7 +27,7 @@ then
   echo -e "${GREEN} Switch to plugin ${$PLUGIN_NAME} DIR ${SET}"
   cp -r $WORKSPACE/../* /home/runner/work/$PLUGIN_NAME/
   mv /home/runner/work/$PLUGIN_NAME /home/runner/work/matomo/matomo/plugins/
-  cd plugins/$PLUGIN_NAME
+  cd /home/runner/work/matomo/matomo/plugins/$PLUGIN_NAME
 fi
 if [ -n "$REF" ]
 then
