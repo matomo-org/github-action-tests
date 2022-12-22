@@ -1,49 +1,39 @@
 #!/bin/bash
 
-
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 SET='\033[0m'
 
-echo -e "${GREEN} Prepare directory ${SET}"
-if [ "$PLUGIN_NAME" == '' ]
-then
-    echo -e "${GREEN} rm matomo folder${SET}"
-    sudo rm -r /home/runner/work/matomo/*
-fi
 if [ "$PLUGIN_NAME" != '' ]
 then
-   sudo mkdir /home/runner/work/matomo/
-   sudo chown -R "$USER":www-data /home/runner/work/matomo/
-fi
+  echo -e "${GREEN} Prepare directory for plugin tests ${SET}"
 
-echo -e "${GREEN} Clone repo${SET}"
-cd /home/runner/work/matomo
-git clone --recurse-submodules https://github.com/matomo-org/matomo
-cd /home/runner/work/matomo/matomo
+  echo -e "${GREEN} Move plugin content to directory${SET}"
+  cd $WORKSPACE
+  mkdir $PLUGIN_NAME
+  cp -R !($PLUGIN_NAME) $PLUGIN_NAME
 
-if [ "$PLUGIN_NAME" != '' ]
-then
-  echo -e "${GREEN} Switch to plugin ${$PLUGIN_NAME} DIR ${SET}"
-  cp -r $WORKSPACE/../* /home/runner/work/$PLUGIN_NAME/
-  mv /home/runner/work/$PLUGIN_NAME /home/runner/work/matomo/matomo/plugins/
-  cd /home/runner/work/matomo/matomo/plugins/$PLUGIN_NAME
+  echo -e "${GREEN} Clone Matomo repo${SET}"
+  git clone -q --recurse-submodules https://github.com/matomo-org/matomo
+  git fetch -q --all
+  $ACTION_PATH/scripts/bash/checkout_test_against_branch.sh
+
+  echo -e "${GREEN} Remove existing plugin (for submodules)${SET}"
+  sudo rm -r $WORKSPACE/matomo/plugins/$PLUGIN_NAME
+
+  echo -e "${GREEN} Move checked out plugin to plugins directory${SET}"
+  cd $WORKSPACE/matomo
+  sudo mv ../$PLUGIN_NAME plugins
+
+  echo -e "${GREEN} Prepare directory for plugin tests ${SET}"
 fi
-if [ -n "$REF" ]
-then
-   echo -e "${GREEN} Checkout ${REF} branch ${SET}"
-   git fetch origin $REF:newbranch
-   git checkout -b current newbranch
-fi
-cd /home/runner/work/matomo/matomo
-git submodule update --init --recursive
 
 # set up fonts
 if [ "$MATOMO_TEST_TARGET" = "UI" ];
 then
   echo -e "${GREEN}Setup fonts${SET}"
   mkdir $HOME/.fonts
-  cp /home/runner/work/appendix/artifacts/fonts/* $HOME/.fonts
+  cp $ACTION_PATH/artifacts/fonts/* $HOME/.fonts
   fc-cache -f -v
   ls $HOME/.fonts
   sudo sed -i -E 's/name="memory" value="[^"]+"/name="memory" value="2GiB"/g' /etc/ImageMagick-6/policy.xml
@@ -67,16 +57,16 @@ then
 fi
 
 # setup config
-sed "s/PDO_MYSQL/$MYSQL_ADAPTER/g" /home/runner/work/appendix/artifacts/config.ini.github.php > config/config.ini.php
+sed "s/PDO_MYSQL/$MYSQL_ADAPTER/g" $ACTION_PATH/artifacts/config.ini.github.php > config/config.ini.php
 
 # setup js and phpunit.xml
 if [ "$MATOMO_TEST_TARGET" = "UI" ];
 then
   echo -e "${GREEN}installing node/puppeteer${SET}"
-  cd /home/runner/work/matomo/matomo/tests/lib/screenshot-testing
+  cd $WORKSPACE/matomo/tests/lib/screenshot-testing
   git lfs pull --exclude=
   npm install
-  cd /home/runner/work/matomo/matomo/
+  cd $WORKSPACE/matomo/
   cp ./tests/UI/config.dist.js ./tests/UI/config.js
   chmod a+rw ./tests/lib/geoip-files || true
   chmod a+rw ./plugins/*/tests/System/processed || true
@@ -90,27 +80,27 @@ fi
 if [ "$MATOMO_TEST_TARGET" = "JS" ] || [ "$MATOMO_TEST_TARGET" = "Angular" ];
 then
   echo -e "${GREEN}installing node/puppeteer${SET}"
-  cd /home/runner/work/matomo/matomo/tests/lib/screenshot-testing
+  cd $WORKSPACE/matomo/tests/lib/screenshot-testing
   git lfs pull --exclude=
   npm install
-  cd /home/runner/work/matomo/matomo/
+  cd $WORKSPACE/matomo/
   echo -e "${GREEN}start php on 80${SET}"
   sudo setcap CAP_NET_BIND_SERVICE=+eip $(readlink -f $(which php))
   tmux new-session -d -s "php-cgi" sudo php -S 127.0.0.1:80
   tmux ls
 else
   echo -e "${GREEN}setup php-fpm${SET}"
-  cd /home/runner/work/matomo/matomo/
+  cd $WORKSPACE/matomo/
   sudo systemctl enable php$PHP_VERSION-fpm.service
   sudo systemctl start php$PHP_VERSION-fpm.service
-  sudo sed 's/VersionNumber/$PHP_VERSION/g' /home/runner/work/appendix/artifacts/www.conf
-  sudo cp /home/runner/work/appendix/artifacts/www.conf  /etc/php/$PHP_VERSION/fpm/pool.d/
+  sudo sed 's/VersionNumber/$PHP_VERSION/g' $ACTION_PATH/artifacts/www.conf
+  sudo cp $ACTION_PATH/artifacts/www.conf  /etc/php/$PHP_VERSION/fpm/pool.d/
   sudo systemctl reload php$PHP_VERSION-fpm.service
   sudo systemctl restart php$PHP_VERSION-fpm.service
   sudo systemctl enable nginx
   sudo systemctl start nginx
-  sudo sed 's/VersionNumber/$PHP_VERSION/g' /home/runner/work/appendix/artifacts/ui_nginx.conf
-  sudo cp  /home/runner/work/appendix/artifacts/ui_nginx.conf /etc/nginx/conf.d/
+  sudo sed 's/VersionNumber/$PHP_VERSION/g' $ACTION_PATH/artifacts/ui_nginx.conf
+  sudo cp $ACTION_PATH/artifacts/ui_nginx.conf /etc/nginx/conf.d/
   sudo unlink /etc/nginx/sites-enabled/default
   sudo systemctl reload nginx
   sudo systemctl restart nginx
@@ -127,7 +117,7 @@ fi
 
 #make tmp folder
 echo -e "${GREEN}set up Folder${SET}"
-cd /home/runner/work/matomo/matomo/
+cd $WORKSPACE/matomo/
 mkdir -p ./tmp/assets
 mkdir -p ./tmp/cache
 mkdir -p ./tmp/cache/tracker
@@ -144,11 +134,11 @@ mkdir -p /tmp
 
 #set up folder permission
 echo -e "${GREEN}set tmp and screenshot folder permission${SET}"
-sudo chown -R "$USER":www-data /home/runner/work/matomo/matomo/
-sudo chmod o+w /home/runner/work/matomo/matomo/
-cd /home/runner/work/matomo/matomo/
+sudo chown -R "$USER":www-data /$WORKSPACE/matomo/
+sudo chmod o+w $WORKSPACE/matomo/
+cd $WORKSPACE/matomo/
 sudo gpasswd -a "$USER" www-data
-sudo chmod -R 777 /home/runner/work/matomo/matomo/tmp
-sudo chmod -R 777 /home/runner/work/matomo/matomo/tmp/assets
-sudo chmod -R 777 /home/runner/work/matomo/matomo/tmp/templates_c
-sudo chmod -R 777 /home/runner/work/matomo/matomo/tests/UI
+sudo chmod -R 777 $WORKSPACE/matomo/tmp
+sudo chmod -R 777 $WORKSPACE/matomo/tmp/assets
+sudo chmod -R 777 $WORKSPACE/matomo/tmp/templates_c
+sudo chmod -R 777 $WORKSPACE/matomo/tests/UI

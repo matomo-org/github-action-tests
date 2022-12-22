@@ -13,9 +13,6 @@ inputs:
       - Angular
       - All
     default: PHP
-  git-ref:
-    description: "ref"
-    required: true
   run-id:
     description: "GitHub Run Id"
     required: false
@@ -52,7 +49,7 @@ inputs:
     required: true
     default: ''
   node-version:
-    description: 'node version, default 12'
+    description: 'node version'
     required: false
     default: ''
   php-memory:
@@ -69,10 +66,10 @@ inputs:
     description: "require mysql services"
     required: false
     default: true
-  workspace:
+  matomo-test-branch:
+    description: "branch or tag of Matomo to run plugin tests for"
     required: false
-    description: "when the repo is private repo different from plugin name"
-
+    default: ''
 
 runs:
   using: "composite"
@@ -131,13 +128,14 @@ runs:
         MYSQL_ADAPTER: ${{ inputs.mysql-driver }}
         PLUGIN_NAME: ${{ inputs.plugin-name }}
         COMMAND: ${{ inputs.test-command }}
-        REF: ${{ inputs.git-ref }}
-        WORKSPACE: ${{ inputs.workspace }}
+        TEST_AGAINST_PIWIK_BRANCH: ${{ inputs.matomo-test-branch }}
+        WORKSPACE: ${{ github.workspace }}
+        ACTION_PATH: ${{ github.action_path }}
 
     # setting up plugin tests
     - name: PluginTests Test runing
       if: inputs.plugin-name != ''
-      working-directory: /home/runner/work/matomo/matomo
+      working-directory: ${{ github.workspace }}/matomo
       shell: bash
       run: ./scripts/bash/pluginTests.sh
       env:
@@ -147,7 +145,7 @@ runs:
     # running main tests
     - name: Test PHP running
       if: inputs.plugin-name == '' && inputs.test-type == 'PHP'
-      working-directory: /home/runner/work/matomo/matomo
+      working-directory: ${{ github.workspace }}/matomo
       shell: bash
       run: |
         ./vendor/phpunit/phpunit/phpunit --configuration ./tests/PHPUnit/phpunit.xml --testsuite ${{ inputs.test-command }}
@@ -159,7 +157,7 @@ runs:
 
     - name: Test JS running
       if: inputs.plugin-name == '' && inputs.test-type == 'JS'
-      working-directory: /home/runner/work/matomo/matomo
+      working-directory: ${{ github.workspace }}/matomo
       shell: bash
       run: |
         ./console tests:run-js --matomo-url='http://localhost'
@@ -171,7 +169,7 @@ runs:
 
     - name: Test Angular running
       if: inputs.plugin-name == '' && inputs.test-type == 'Angular'
-      working-directory: /home/runner/work/matomo/matomo
+      working-directory: ${{ github.workspace }}/matomo
       shell: bash
       run: |
         cd /home/runner/work/matomo/matomo/tests/angularjs
@@ -183,7 +181,7 @@ runs:
 
     - name: Test UI running
       if: inputs.plugin-name == '' && inputs.test-type == 'UI'
-      working-directory: /home/runner/work/matomo/matomo
+      working-directory: ${{ github.workspace }}/matomo
       shell: bash
       run: |
         ./console tests:run-ui --store-in-ui-tests-repo --persist-fixture-data --assume-artifacts --core --extra-options="--num-test-groups=8 --test-group=${{ inputs.test-command }}"
