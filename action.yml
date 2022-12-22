@@ -52,11 +52,7 @@ inputs:
     required: true
     default: ''
   node-version:
-    description: 'node version default 12'
-    required: false
-    default: ''
-  addition:
-    description: 'additional test or setup'
+    description: 'node version, default 12'
     required: false
     default: ''
   php-memory:
@@ -146,7 +142,6 @@ runs:
         PHP_VERSION: ${{ inputs.php-version }}
         MATOMO_TEST_TARGET: ${{ inputs.test-type }}
         MYSQL_ADAPTER: ${{ inputs.mysql-driver }}
-        ADDITION: ${{ inputs.addition }}
         PLUGIN_NAME: ${{ inputs.plugin-name }}
         COMMAND: ${{ inputs.test-command }}
         REF: ${{ inputs.git-ref }}

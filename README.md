@@ -24,8 +24,6 @@ The Package include webserver, mysql, PHP setting up. You can also change the in
 
 `php-extensions` `string` optional see here for more detail https://github.com/shivammathur/setup-php
 
-`addition` if test required eg: ldap
-
 `test-command:` the command used to run the tests
 
 `php-memory` If you like to increase or decrease the PHP memory, default 256M.
