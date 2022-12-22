@@ -60,20 +60,14 @@ inputs:
     required: false
     default: "256M"
   redis-service:
-    type: choice
+    type: boolean
     description: "require reds services"
     required: false
-    options:
-      - true
-      - false
     default: false
   mysql-service:
-    type: choice
+    type: boolean
     description: "require mysql services"
     required: false
-    options:
-      - true
-      - false
     default: true
   workspace:
     required: false
@@ -83,6 +77,8 @@ inputs:
 runs:
   using: "composite"
   steps:
+
+    ## Start required services
     - name: start mysql services
       if: inputs.mysql-service == 'true'
       shell: bash
@@ -96,16 +92,7 @@ runs:
         docker run -d --name redis -e ALLOW_EMPTY_PASSWORD=yes -p 6379:6379 bitnami/redis:latest
         docker run -d --name redis-sentinel -p 26379:26379 bitnami/redis-sentinel:latest
 
-    - name: Checkout code
-      shell: bash
-      run: |
-        git config --global advice.detachedHead false
-        cd /home/runner/work/
-        git clone https://github.com/matomo-org/github-action-tests.git appendix
-        cd appendix
-        git checkout v1
-
-      # setup php
+    # Setup PHP (if needed)
     - name: Setup PHP
       if: inputs.php-version != ''
       uses: shivammathur/setup-php@v2
@@ -127,17 +114,17 @@ runs:
         tools: composer:v2
         coverage: none
 
-      # if required node setup node
+    # Setup node (if needed)
     - name: Setup Node
       if: inputs.node-version != ''
-      uses: actions/setup-node@v2
+      uses: actions/setup-node@v3
       with:
         node-version: ${{ inputs.node-version }}
 
-      # setup apache etc
+    # setup apache etc
     - name: prepare setup
       shell: bash
-      run: /home/runner/work/appendix/scripts/bash/prepare.sh
+      run: ./scripts/bash/prepare.sh
       env:
         PHP_VERSION: ${{ inputs.php-version }}
         MATOMO_TEST_TARGET: ${{ inputs.test-type }}
@@ -147,17 +134,17 @@ runs:
         REF: ${{ inputs.git-ref }}
         WORKSPACE: ${{ inputs.workspace }}
 
-      # setting up plugin tests
+    # setting up plugin tests
     - name: PluginTests Test runing
       if: inputs.plugin-name != ''
       working-directory: /home/runner/work/matomo/matomo
       shell: bash
-      run: /home/runner/work/appendix/scripts/bash/pluginTests.sh
+      run: ./scripts/bash/pluginTests.sh
       env:
         TEST_SUITE: ${{ inputs.test-type }}
         PLUGIN_NAME: ${{ inputs.plugin-name }}
 
-      # running main tests
+    # running main tests
     - name: Test PHP running
       if: inputs.plugin-name == '' && inputs.test-type == 'PHP'
       working-directory: /home/runner/work/matomo/matomo
@@ -203,12 +190,12 @@ runs:
       env:
         TRAVIS: true
         GITHUB: true
-      # system checks failed, upload expected xml and PDF
 
+    # system checks failed, upload expected xml and PDF
     - name: upload processed screenshots
       if: failure() && (inputs.test-type == 'UI' || inputs.test-type == 'All' || inputs.test-type == 'PluginTests')
       shell: bash
-      run: /home/runner/work/appendix/scripts/bash/upload_artifacts.sh
+      run: ./scripts/bash/upload_artifacts.sh
       env:
         ARTIFACTS_PASS: ${{ inputs.artifect-pass }}
         GITHUB_REPO: ${{ inputs.repository }}
@@ -219,7 +206,7 @@ runs:
     - name: View UI failures
       if: failure() && (inputs.test-type == 'UI' || inputs.test-type == 'All' || inputs.test-type == 'PluginTests')
       shell: bash
-      run: /home/runner/work/appendix/scripts/bash/view_ui_failed.sh
+      run: ./scripts/bash/view_ui_failed.sh
       env:
         GITHUB_REPO: ${{ inputs.repository }}
         GITHUB_BRANCH: ${{ inputs.merge-target }}
