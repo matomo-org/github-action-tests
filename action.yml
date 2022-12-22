@@ -13,12 +13,6 @@ inputs:
       - Angular
       - All
     default: PHP
-  run-id:
-    description: "GitHub Run Id"
-    required: false
-  repository:
-    description: "GitHub repository"
-    required: false
   run-number:
     description: "GitHub run number"
     required: false
@@ -196,16 +190,16 @@ runs:
       run: ./scripts/bash/upload_artifacts.sh
       env:
         ARTIFACTS_PASS: ${{ inputs.artifect-pass }}
-        GITHUB_REPO: ${{ inputs.repository }}
-        GITHUB_BRANCH: ${{ inputs.merge-target }}
-        GITHUB_RUN_ID: ${{ inputs.run-id }}
-        GITHUB_RUN_NUMBER: ${{ inputs.run-number }}
+        GITHUB_REPO: ${{ github.repository }}
+        GITHUB_BRANCH: ${{ github.ref_name }}
+        GITHUB_RUN_ID: ${{ github.run-id }}
+        GITHUB_RUN_NUMBER: ${{ github.run-number }}
 
     - name: View UI failures
       if: failure() && (inputs.test-type == 'UI' || inputs.test-type == 'All' || inputs.test-type == 'PluginTests')
       shell: bash
       run: ./scripts/bash/view_ui_failed.sh
       env:
-        GITHUB_REPO: ${{ inputs.repository }}
-        GITHUB_BRANCH: ${{ inputs.merge-target }}
-        GITHUB_RUN_ID: ${{ inputs.run-id }}
+        GITHUB_REPO: ${{ github.repository }}
+        GITHUB_BRANCH: ${{ github.ref_name }}
+        GITHUB_RUN_ID: ${{ github.run-id }}
