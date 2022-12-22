@@ -10,4 +10,4 @@ echo -e "${GREEN}https://builds-artifacts.matomo.org/github/$GITHUB_REPO/$GITHUB
 echo ""
 echo -e "${RED}If the new screenshots are valid, then you can copy them over to the right directory with the command:${SET}"
 echo ""
-echo -e "${GREEN}./console tests:sync-ui-screenshots -a github -r matomo-org/matomo $GITHUB_RUN_ID${SET}"
+echo -e "${GREEN}./console tests:sync-ui-screenshots -a github -r $GITHUB_REPO $GITHUB_RUN_ID${SET}"

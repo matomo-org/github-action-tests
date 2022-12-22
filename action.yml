@@ -189,11 +189,12 @@ runs:
       shell: bash
       run: ${{ github.action_path }}/scripts/bash/upload_artifacts.sh
       env:
-        ARTIFACTS_PASS: ${{ inputs.artifect-pass }}
+        ARTIFACTS_PASS: ${{ inputs.artifact-pass }}
         GITHUB_REPO: ${{ github.repository }}
         GITHUB_BRANCH: ${{ github.ref_name }}
         GITHUB_RUN_ID: ${{ github.run-id }}
         GITHUB_RUN_NUMBER: ${{ github.run-number }}
+        WORKSPACE: ${{ github.workspace }}/matomo
 
     - name: View UI failures
       if: failure() && (inputs.test-type == 'UI' || inputs.test-type == 'All' || inputs.test-type == 'PluginTests')
