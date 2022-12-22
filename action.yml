@@ -115,7 +115,7 @@ runs:
     # setup apache etc
     - name: prepare setup
       shell: bash
-      run: ./scripts/bash/prepare.sh
+      run: ${{ github.action_path }}/scripts/bash/prepare.sh
       env:
         PHP_VERSION: ${{ inputs.php-version }}
         MATOMO_TEST_TARGET: ${{ inputs.test-type }}
@@ -131,7 +131,7 @@ runs:
       if: inputs.plugin-name != ''
       working-directory: ${{ github.workspace }}/matomo
       shell: bash
-      run: ./scripts/bash/pluginTests.sh
+      run: ${{ github.action_path }}/scripts/bash/pluginTests.sh
       env:
         TEST_SUITE: ${{ inputs.test-type }}
         PLUGIN_NAME: ${{ inputs.plugin-name }}
@@ -187,7 +187,7 @@ runs:
     - name: upload processed screenshots
       if: failure() && (inputs.test-type == 'UI' || inputs.test-type == 'All' || inputs.test-type == 'PluginTests')
       shell: bash
-      run: ./scripts/bash/upload_artifacts.sh
+      run: ${{ github.action_path }}/scripts/bash/upload_artifacts.sh
       env:
         ARTIFACTS_PASS: ${{ inputs.artifect-pass }}
         GITHUB_REPO: ${{ github.repository }}
@@ -198,7 +198,7 @@ runs:
     - name: View UI failures
       if: failure() && (inputs.test-type == 'UI' || inputs.test-type == 'All' || inputs.test-type == 'PluginTests')
       shell: bash
-      run: ./scripts/bash/view_ui_failed.sh
+      run: ${{ github.action_path }}/scripts/bash/view_ui_failed.sh
       env:
         GITHUB_REPO: ${{ github.repository }}
         GITHUB_BRANCH: ${{ github.ref_name }}
