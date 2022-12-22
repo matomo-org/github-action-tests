@@ -6,6 +6,8 @@ SET='\033[0m'
 
 shopt -s extglob
 
+echo -e "${GREEN} Using workspace path $WORKSPACE ${SET}"
+
 if [ "$PLUGIN_NAME" != '' ]
 then
   echo -e "${GREEN} Prepare directory for plugin tests ${SET}"
