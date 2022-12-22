@@ -4,6 +4,8 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 SET='\033[0m'
 
+shopt -s extglob
+
 if [ "$PLUGIN_NAME" != '' ]
 then
   echo -e "${GREEN} Prepare directory for plugin tests ${SET}"
@@ -45,7 +47,7 @@ then
 fi
 
 # composer install
-cd /home/runner/work/matomo/matomo/
+cd $WORKSPACE/matomo
 echo -e "${GREEN}install composer${SET}"
 composer install --ignore-platform-reqs
 
@@ -66,7 +68,7 @@ then
   cd $WORKSPACE/matomo/tests/lib/screenshot-testing
   git lfs pull --exclude=
   npm install
-  cd $WORKSPACE/matomo/
+  cd $WORKSPACE/matomo
   cp ./tests/UI/config.dist.js ./tests/UI/config.js
   chmod a+rw ./tests/lib/geoip-files || true
   chmod a+rw ./plugins/*/tests/System/processed || true
@@ -83,14 +85,14 @@ then
   cd $WORKSPACE/matomo/tests/lib/screenshot-testing
   git lfs pull --exclude=
   npm install
-  cd $WORKSPACE/matomo/
+  cd $WORKSPACE/matomo
   echo -e "${GREEN}start php on 80${SET}"
   sudo setcap CAP_NET_BIND_SERVICE=+eip $(readlink -f $(which php))
   tmux new-session -d -s "php-cgi" sudo php -S 127.0.0.1:80
   tmux ls
 else
   echo -e "${GREEN}setup php-fpm${SET}"
-  cd $WORKSPACE/matomo/
+  cd $WORKSPACE/matomo
   sudo systemctl enable php$PHP_VERSION-fpm.service
   sudo systemctl start php$PHP_VERSION-fpm.service
   sudo sed 's/VersionNumber/$PHP_VERSION/g' $ACTION_PATH/artifacts/www.conf
@@ -117,7 +119,7 @@ fi
 
 #make tmp folder
 echo -e "${GREEN}set up Folder${SET}"
-cd $WORKSPACE/matomo/
+cd $WORKSPACE/matomo
 mkdir -p ./tmp/assets
 mkdir -p ./tmp/cache
 mkdir -p ./tmp/cache/tracker
