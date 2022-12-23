@@ -14,6 +14,8 @@ then
     if [ "$TEST_SUITE" = "Angular" ]
     then
      echo -e "${GREEN}Running angularjs tests${SET}"
+     cd tests/angularjs
+     npm install
      ./node_modules/karma/bin/karma start karma.conf.js --browsers ChromeHeadless --single-run
      echo -e "${GREEN}Running vue tests${SET}"
      npm test
@@ -28,27 +30,6 @@ then
         else
             ./console tests:run-ui --store-in-ui-tests-repo --persist-fixture-data --assume-artifacts --core --extra-options="$UITEST_EXTRA_OPTIONS"
         fi
-    elif [ "$TEST_SUITE" = "All" ]
-    then
-        exit_code=0
-
-        if [ "$ALLTEST_EXTRA_OPTIONS" = "--run-first-half-only" ]
-        then
-            echo "Executing tests in test suite UnitTests"
-            ./vendor/phpunit/phpunit/phpunit --configuration ./tests/PHPUnit/phpunit.xml --testsuite UnitTests --colors $PHPUNIT_EXTRA_OPTIONS || exit_code=$?
-            echo "Executing tests in test suite SystemTests for Plugins"
-            ./vendor/phpunit/phpunit/phpunit --configuration ./tests/PHPUnit/phpunit.xml --testsuite SystemTestsPlugins --colors $PHPUNIT_EXTRA_OPTIONS || exit_code=$?
-            echo "Executing tests in test suite SystemTests for Core"
-            ./vendor/phpunit/phpunit/phpunit --configuration ./tests/PHPUnit/phpunit.xml --testsuite SystemTestsCore --colors $PHPUNIT_EXTRA_OPTIONS || exit_code=$?
-        elif [ "$ALLTEST_EXTRA_OPTIONS" = "--run-second-half-only" ]
-        then
-            echo "Executing tests in test suite IntegrationTests"
-            ./vendor/phpunit/phpunit/phpunit --configuration ./tests/PHPUnit/phpunit.xml --testsuite IntegrationTests --colors $PHPUNIT_EXTRA_OPTIONS || exit_code=$?
-        else
-            ./console tests:run --options="--colors" || exit_code=$?
-        fi
-
-        exit $exit_code
     else
         if [ -n "$PLUGIN_NAME" ]
         then

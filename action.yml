@@ -7,10 +7,14 @@ inputs:
     required: true
     options:
       - UI
-      - PHP
       - PluginTests
       - JS
       - Angular
+      - UnitTests
+      - SystemTestsPlugins
+      - SystemTestsCore
+      - IntegrationTestsCore
+      - IntegrationTestsPlugins
     default: PHP
   run-number:
     description: "GitHub run number"
@@ -28,14 +32,11 @@ inputs:
       - PDO_MYSQL
       - MYSQLI
     default: 'PDO_MYSQL'
-  test-command:
-    description: "Test name to run the tests"
-    options:
-      - UnitTests
-      - SystemTestsPlugins
-      - SystemTestsCore
-      - IntegrationTestsCore
-      - IntegrationTestsPlugins
+  ui-test-options:
+    description: "Additional options to run UI tests with"
+    required: false
+  phpunit-test-options:
+    description: "Additional options to run PHPUnit with"
     required: false
   php-version:
     description: '7.2-8.1'
@@ -68,7 +69,6 @@ runs:
   using: "composite"
   steps:
 
-    ## Start required services
     - name: start mysql services
       if: inputs.mysql-service == 'true'
       shell: bash
@@ -76,6 +76,7 @@ runs:
         docker run -d  --tmpfs /var/lib/mysql:rw --tmpfs /bitnami/mysql/data:rw --name mysql -p 3306:3306 -e ALLOW_EMPTY_PASSWORD=yes -e MYSQL_DATABASE=matomo_tests bitnami/mysql:5.7
         sleep 10
         mysql -h127.0.0.1 -uroot -e "SET GLOBAL sql_mode = 'NO_ENGINE_SUBSTITUTION,STRICT_TRANS_TABLES';SET GLOBAL wait_timeout = 36000;SET GLOBAL max_allowed_packet = 134209536;"
+
     - name: start redis serivces
       if: inputs.redis-service == 'true'
       shell: bash
@@ -83,7 +84,6 @@ runs:
         docker run -d --name redis -e ALLOW_EMPTY_PASSWORD=yes -p 6379:6379 bitnami/redis:latest
         docker run -d --name redis-sentinel -p 26379:26379 bitnami/redis-sentinel:latest
 
-    # Setup PHP (if needed)
     - name: Setup PHP
       if: inputs.php-version != ''
       uses: shivammathur/setup-php@v2
@@ -105,7 +105,6 @@ runs:
         tools: composer:v2
         coverage: none
 
-    # Setup node (if needed)
     - name: Setup Node
       if: inputs.node-version != ''
       uses: actions/setup-node@v3
@@ -121,67 +120,19 @@ runs:
         MATOMO_TEST_TARGET: ${{ inputs.test-type }}
         MYSQL_ADAPTER: ${{ inputs.mysql-driver }}
         PLUGIN_NAME: ${{ inputs.plugin-name }}
-        COMMAND: ${{ inputs.test-command }}
         TEST_AGAINST_PIWIK_BRANCH: ${{ inputs.matomo-test-branch }}
         WORKSPACE: ${{ github.workspace }}
         ACTION_PATH: ${{ github.action_path }}
 
-    # setting up plugin tests
-    - name: PluginTests Test runing
-      if: inputs.plugin-name != ''
+    - name: Run tests
       working-directory: ${{ github.workspace }}/matomo
       shell: bash
-      run: ${{ github.action_path }}/scripts/bash/pluginTests.sh
+      run: ${{ github.action_path }}/scripts/bash/run_tests.sh
       env:
         TEST_SUITE: ${{ inputs.test-type }}
         PLUGIN_NAME: ${{ inputs.plugin-name }}
-
-    # running main tests
-    - name: Test PHP running
-      if: inputs.plugin-name == '' && inputs.test-type == 'PHP'
-      working-directory: ${{ github.workspace }}/matomo
-      shell: bash
-      run: |
-        ./vendor/phpunit/phpunit/phpunit --configuration ./tests/PHPUnit/phpunit.xml --testsuite ${{ inputs.test-command }}
-      env:
-        TRAVIS: true
-        GITHUB: true
-        PHP_VERSION: ${{ inputs.php-version }}
-        MYSQL_ADAPTER: ${{ inputs.mysql-driver }}
-
-    - name: Test JS running
-      if: inputs.plugin-name == '' && inputs.test-type == 'JS'
-      working-directory: ${{ github.workspace }}/matomo
-      shell: bash
-      run: |
-        ./console tests:run-js --matomo-url='http://localhost'
-      env:
-        TRAVIS: true
-        GITHUB: true
-        PHP_VERSION: ${{ inputs.php-version }}
-        MYSQL_ADAPTER: ${{ inputs.mysql-driver }}
-
-    - name: Test Angular running
-      if: inputs.plugin-name == '' && inputs.test-type == 'Angular'
-      working-directory: ${{ github.workspace }}/matomo
-      shell: bash
-      run: |
-        cd ${{ github.workspace }}/matomo/tests/angularjs
-        npm install
-        ./node_modules/karma/bin/karma start karma.conf.js --browsers ChromeHeadless --single-run
-      env:
-        TRAVIS: true
-        GITHUB: true
-
-    - name: Test UI running
-      if: inputs.plugin-name == '' && inputs.test-type == 'UI'
-      working-directory: ${{ github.workspace }}/matomo
-      shell: bash
-      run: |
-        ./console tests:run-ui --store-in-ui-tests-repo --persist-fixture-data --assume-artifacts --core --extra-options="--num-test-groups=8 --test-group=${{ inputs.test-command }}"
-      env:
-        TRAVIS: true
-        GITHUB: true
+        UITEST_EXTRA_OPTIONS: ${{ inputs.ui-test-options }}
+        PHPUNIT_EXTRA_OPTIONS: ${{ inputs.phpunit-test-options }}
 
     # system checks failed, upload expected xml and PDF
     - name: upload processed screenshots
