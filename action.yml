@@ -191,7 +191,7 @@ runs:
       env:
         ARTIFACTS_PASS: ${{ inputs.artifact-pass }}
         GITHUB_REPO: ${{ github.repository }}
-        GITHUB_BRANCH: ${{ github.ref_name }}
+        GITHUB_BRANCH: ${{ github.head_ref || github.ref_name }}
         GITHUB_RUN_ID: ${{ github.run-id }}
         GITHUB_RUN_NUMBER: ${{ github.run-number }}
         WORKSPACE: ${{ github.workspace }}/matomo
@@ -202,5 +202,5 @@ runs:
       run: ${{ github.action_path }}/scripts/bash/view_ui_failed.sh
       env:
         GITHUB_REPO: ${{ github.repository }}
-        GITHUB_BRANCH: ${{ github.ref_name }}
+        GITHUB_BRANCH: ${{ github.head_ref || github.ref_name }}
         GITHUB_RUN_ID: ${{ github.run-id }}
