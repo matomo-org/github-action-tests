@@ -34,6 +34,13 @@ fi
 
 if [ "$MATOMO_TEST_TARGET" = "UI" ];
 then
+  cd $WORKSPACE/matomo
+  git lfs pull --exclude=
+  if [ "$PLUGIN_NAME" != '' ]
+  then
+    cd $WORKSPACE/matomo/plugins/$PLUGIN_NAME
+    git lfs pull --exclude=
+  fi
   echo -e "${GREEN}setup fonts${SET}"
   mkdir $HOME/.fonts
   cp $ACTION_PATH/artifacts/fonts/* $HOME/.fonts
@@ -62,7 +69,7 @@ fi
 sed "s/PDO_MYSQL/$MYSQL_ADAPTER/g" $ACTION_PATH/artifacts/config.ini.github.php > config/config.ini.php
 
 # setup js and phpunit.xml
-if [ "$MATOMO_TEST_TARGET" = "UI" ] || [ "$MATOMO_TEST_TARGET" = "JS" ] || [ "$MATOMO_TEST_TARGET" = "Angular" ];
+if [ "$MATOMO_TEST_TARGET" = "UI" ] || [ "$MATOMO_TEST_TARGET" = "JS" ];
 then
   echo -e "${GREEN}installing node/puppeteer${SET}"
   cd $WORKSPACE/matomo/tests/lib/screenshot-testing
