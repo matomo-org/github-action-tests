@@ -20,13 +20,13 @@ then
   echo -e "${GREEN}Clone Matomo repo${SET}"
   git clone -q --recurse-submodules https://github.com/matomo-org/matomo
   git fetch -q --all
+  cd $WORKSPACE/matomo
   $ACTION_PATH/scripts/bash/checkout_test_against_branch.sh
 
   echo -e "${GREEN}Remove existing plugin (for submodules)${SET}"
   sudo rm -r $WORKSPACE/matomo/plugins/$PLUGIN_NAME
 
   echo -e "${GREEN}Move checked out plugin to plugins directory${SET}"
-  cd $WORKSPACE/matomo
   sudo mv ../$PLUGIN_NAME plugins
 fi
 
@@ -97,13 +97,14 @@ else
   cd $WORKSPACE/matomo
   sudo systemctl enable php$PHP_VERSION-fpm.service
   sudo systemctl start php$PHP_VERSION-fpm.service
-  sudo sed 's/VersionNumber/$PHP_VERSION/g' $ACTION_PATH/artifacts/www.conf
-  sudo cp $ACTION_PATH/artifacts/www.conf  /etc/php/$PHP_VERSION/fpm/pool.d/
+  sudo sed -i "s!{VersionNumber}!$PHP_VERSION!g" $ACTION_PATH/artifacts/www.conf
+  sudo cp $ACTION_PATH/artifacts/www.conf /etc/php/$PHP_VERSION/fpm/pool.d/
   sudo systemctl reload php$PHP_VERSION-fpm.service
   sudo systemctl restart php$PHP_VERSION-fpm.service
   sudo systemctl enable nginx
   sudo systemctl start nginx
-  sudo sed 's/VersionNumber/$PHP_VERSION/g' $ACTION_PATH/artifacts/ui_nginx.conf
+  sudo sed -i "s!{VersionNumber}!$PHP_VERSION!g" $ACTION_PATH/artifacts/ui_nginx.conf
+  sudo sed -i "s!{WORKSPACE}!$WORKSPACE/matomo!g" $ACTION_PATH/artifacts/ui_nginx.conf
   sudo cp $ACTION_PATH/artifacts/ui_nginx.conf /etc/nginx/conf.d/
   sudo unlink /etc/nginx/sites-enabled/default
   sudo systemctl reload nginx

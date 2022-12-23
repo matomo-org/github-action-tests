@@ -9,7 +9,7 @@ if [ "$TEST_AGAINST_MATOMO_BRANCH" == "" ]; then
         #echo "Testing against 'latest_stable' is no longer supported, please test against 'minimum_required_matomo'."
         #exit 1
     elif [[ "$TEST_AGAINST_CORE" == "minimum_required_matomo" && "$PLUGIN_NAME" != "" ]]; then # test against the minimum required Matomo in the plugin.json file
-        export TEST_AGAINST_MATOMO_BRANCH=$(php "$ACTION_PATH/scripts/php/get_required_matomo_version.php" $WORKSPACE $PLUGIN_NAME)
+        export TEST_AGAINST_MATOMO_BRANCH=$(php "$ACTION_PATH/scripts/php/get_required_matomo_version.php" $WORKSPACE/matomo $PLUGIN_NAME)
 
         if ! git rev-parse "$TEST_AGAINST_MATOMO_BRANCH" >/dev/null 2>&1
         then
@@ -26,7 +26,7 @@ if [ "$TEST_AGAINST_MATOMO_BRANCH" == "" ]; then
         fi
     fi
 elif [[ "$TEST_AGAINST_MATOMO_BRANCH" == "maximum_supported_matomo" && "$PLUGIN_NAME" != "" ]]; then # test against the maximum supported Matomo in the plugin.json file
-    export TEST_AGAINST_MATOMO_BRANCH=$(php "$ACTION_PATH/scripts/php/get_required_matomo_version.php" $WORKSPACE $PLUGIN_NAME "max")
+    export TEST_AGAINST_MATOMO_BRANCH=$(php "$ACTION_PATH/scripts/php/get_required_matomo_version.php" $WORKSPACE/matomo $PLUGIN_NAME "max")
 
     if ! git rev-parse "$TEST_AGAINST_MATOMO_BRANCH" >/dev/null 2>&1
     then
@@ -44,7 +44,6 @@ elif [[ "$TEST_AGAINST_MATOMO_BRANCH" == "maximum_supported_matomo" && "$PLUGIN_
 fi
 
 echo "Testing against '$TEST_AGAINST_MATOMO_BRANCH'"
-rm -rf ./tests/travis
 git reset --hard
 if ! git checkout "$TEST_AGAINST_MATOMO_BRANCH" --force; then
     echo ""
