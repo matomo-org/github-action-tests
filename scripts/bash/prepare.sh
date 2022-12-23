@@ -28,8 +28,6 @@ then
   echo -e "${GREEN}Move checked out plugin to plugins directory${SET}"
   cd $WORKSPACE/matomo
   sudo mv ../$PLUGIN_NAME plugins
-
-  echo -e "${GREEN}Prepare directory for plugin tests ${SET}"
 fi
 
 if [ "$MATOMO_TEST_TARGET" = "UI" ];

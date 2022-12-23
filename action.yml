@@ -46,10 +46,6 @@ inputs:
     description: 'node version'
     required: false
     default: ''
-  php-memory:
-    description: "php memory limit"
-    required: false
-    default: "256M"
   redis-service:
     type: boolean
     description: "require reds services"
@@ -92,7 +88,7 @@ runs:
         extensions: bcmath, ldap, curl, zip, pdo_mysql, mysqli, gd, redis, zlib, opcache
         ini-values: |
           post_max_size=256M
-          memory_limit=${{ inputs.php-memory}},
+          memory_limit=512M,
           max_execution_time=10000,
           always_populate_raw_post_data=-1,
           error_reporting=E_ALL,
@@ -120,7 +116,7 @@ runs:
         MATOMO_TEST_TARGET: ${{ inputs.test-type }}
         MYSQL_ADAPTER: ${{ inputs.mysql-driver }}
         PLUGIN_NAME: ${{ inputs.plugin-name }}
-        TEST_AGAINST_PIWIK_BRANCH: ${{ inputs.matomo-test-branch }}
+        TEST_AGAINST_MATOMO_BRANCH: ${{ inputs.matomo-test-branch }}
         WORKSPACE: ${{ github.workspace }}
         ACTION_PATH: ${{ github.action_path }}
 
