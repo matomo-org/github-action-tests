@@ -32,10 +32,9 @@ then
   echo -e "${GREEN}Prepare directory for plugin tests ${SET}"
 fi
 
-# set up fonts
 if [ "$MATOMO_TEST_TARGET" = "UI" ];
 then
-  echo -e "${GREEN}Setup fonts${SET}"
+  echo -e "${GREEN}setup fonts${SET}"
   mkdir $HOME/.fonts
   cp $ACTION_PATH/artifacts/fonts/* $HOME/.fonts
   fc-cache -f -v
@@ -48,13 +47,12 @@ then
 
 fi
 
-# composer install
 cd $WORKSPACE/matomo
-echo -e "${GREEN}install composer${SET}"
+echo -e "${GREEN}composer install${SET}"
 composer install --ignore-platform-reqs
 
 #php 8.1 require unitTest > 9
-if [ "$PHP_VERSION" = "8.1" ];
+if [ "$PHP_VERSION" = "8.1" ] || [ "$PHP_VERSION" = "8.2" ];
 then
   composer remove --dev phpunit/phpunit
   composer require --dev phpunit/phpunit ~9.3 --ignore-platform-reqs
@@ -64,17 +62,14 @@ fi
 sed "s/PDO_MYSQL/$MYSQL_ADAPTER/g" $ACTION_PATH/artifacts/config.ini.github.php > config/config.ini.php
 
 # setup js and phpunit.xml
-if [ "$MATOMO_TEST_TARGET" = "UI" ];
+if [ "$MATOMO_TEST_TARGET" = "UI" ] || [ "$MATOMO_TEST_TARGET" = "JS" ] || [ "$MATOMO_TEST_TARGET" = "Angular" ];
 then
   echo -e "${GREEN}installing node/puppeteer${SET}"
   cd $WORKSPACE/matomo/tests/lib/screenshot-testing
-  git lfs pull --exclude=
   npm install
   cd $WORKSPACE/matomo
   cp ./tests/UI/config.dist.js ./tests/UI/config.js
   chmod a+rw ./tests/lib/geoip-files || true
-  chmod a+rw ./plugins/*/tests/System/processed || true
-  chmod a+rw ./plugins/*/tests/Integration/processed || true
   mkdir -p ./tests/UI/processed-ui-screenshots
 else
   cp ./tests/PHPUnit/phpunit.xml.dist ./tests/PHPUnit/phpunit.xml
@@ -83,10 +78,6 @@ fi
 # if just js tests, running php -S otherwise use php fpm
 if [ "$MATOMO_TEST_TARGET" = "JS" ] || [ "$MATOMO_TEST_TARGET" = "Angular" ];
 then
-  echo -e "${GREEN}installing node/puppeteer${SET}"
-  cd $WORKSPACE/matomo/tests/lib/screenshot-testing
-  git lfs pull --exclude=
-  npm install
   cd $WORKSPACE/matomo
   echo -e "${GREEN}start php on 80${SET}"
   sudo setcap CAP_NET_BIND_SERVICE=+eip $(readlink -f $(which php))
@@ -110,17 +101,15 @@ else
   sudo systemctl restart nginx
 fi
 
-#update chrome drive
 if [ "$MATOMO_TEST_TARGET" = "UI" ];
 then
-  echo -e "${GREEN}update Chrome driver${SET}"
+  echo -e "${GREEN}update chrome driver${SET}"
   sudo apt-get update
   sudo apt-get --only-upgrade install google-chrome-stable
   google-chrome --version
 fi
 
-#make tmp folder
-echo -e "${GREEN}set up Folder${SET}"
+echo -e "${GREEN}prepare tmp folder${SET}"
 cd $WORKSPACE/matomo
 mkdir -p ./tmp/assets
 mkdir -p ./tmp/cache
@@ -136,8 +125,7 @@ mkdir -p ./tmp/tcpdf
 mkdir -p ./tmp/climulti
 mkdir -p /tmp
 
-#set up folder permission
-echo -e "${GREEN}set tmp and screenshot folder permission${SET}"
+echo -e "${GREEN}set folder permissions${SET}"
 sudo chown -R "$USER":www-data /$WORKSPACE/matomo/
 sudo chmod o+w $WORKSPACE/matomo/
 cd $WORKSPACE/matomo/
