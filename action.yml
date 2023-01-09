@@ -87,7 +87,7 @@ runs:
         php-version: ${{ inputs.php-version }}
         extensions: bcmath, ldap, curl, zip, pdo_mysql, mysqli, gd, redis, zlib, opcache
         ini-values: |
-          post_max_size=256M
+          post_max_size=8M
           memory_limit=512M,
           max_execution_time=10000,
           always_populate_raw_post_data=-1,
