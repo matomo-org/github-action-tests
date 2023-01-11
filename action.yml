@@ -64,6 +64,10 @@ inputs:
     description: "additional plugins to checkout before testing. comma separated list of github slugs. e.g. matomo-org/pluginTasksTimetable"
     required: false
     default: ''
+  github-token:
+    description: "token used to checkout dependent plugins. Only required if private repo needs to be checked out"
+    required: false
+    default: ''
 
 runs:
   using: "composite"
@@ -131,6 +135,7 @@ runs:
       working-directory: ${{ github.workspace }}/matomo
       env:
         DEPENDENT_PLUGINS: ${{ inputs.dependent-plugins }}
+        GITHUB_USER_TOKEN: ${{ inputs.github-token }}
 
     - name: Run tests
       working-directory: ${{ github.workspace }}/matomo
