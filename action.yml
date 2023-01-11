@@ -60,6 +60,10 @@ inputs:
     description: "branch or tag of Matomo to run plugin tests for"
     required: false
     default: ''
+  dependent-plugins:
+    description: "additional plugins to checkout before testing. comma separated list of github slugs. e.g. matomo-org/pluginTasksTimetable"
+    required: false
+    default: ''
 
 runs:
   using: "composite"
@@ -119,6 +123,14 @@ runs:
         TEST_AGAINST_MATOMO_BRANCH: ${{ inputs.matomo-test-branch }}
         WORKSPACE: ${{ github.workspace }}
         ACTION_PATH: ${{ github.action_path }}
+
+    - name: checkout additional plugins
+      if: github.dependent-plugins != ''
+      shell: bash
+      run: ${{ github.action_path }}/scripts/bash/checkout_dependent_plugins.sh
+      working-directory: ${{ github.workspace }}/matomo
+      env:
+        DEPENDENT_PLUGINS: ${{ github.dependent-plugins }}
 
     - name: Run tests
       working-directory: ${{ github.workspace }}/matomo
