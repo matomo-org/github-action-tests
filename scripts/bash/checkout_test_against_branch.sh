@@ -5,7 +5,12 @@ if [[ "$TEST_AGAINST_MATOMO_BRANCH" == "minimum_required_matomo" && "$PLUGIN_NAM
 
       if ! git rev-parse "$TEST_AGAINST_MATOMO_BRANCH" >/dev/null 2>&1
       then
-          if ! git rev-parse "${TEST_AGAINST_MATOMO_BRANCH:0:1}.x-dev" >/dev/null 2>&1
+          if git rev-parse "${TEST_AGAINST_MATOMO_BRANCH%-*}" >/dev/null 2>&1
+          then
+              echo "Could not find tag '$TEST_AGAINST_MATOMO_BRANCH' specified in plugin.json, testing against ${TEST_AGAINST_MATOMO_BRANCH%-*}."
+
+              export TEST_AGAINST_MATOMO_BRANCH=${TEST_AGAINST_MATOMO_BRANCH%-*}
+          elif ! git rev-parse "${TEST_AGAINST_MATOMO_BRANCH:0:1}.x-dev" >/dev/null 2>&1
           then
               echo "Could not find tag '$TEST_AGAINST_MATOMO_BRANCH' specified in plugin.json, testing against 4.x-dev."
 

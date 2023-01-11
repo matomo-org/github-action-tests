@@ -125,12 +125,12 @@ runs:
         ACTION_PATH: ${{ github.action_path }}
 
     - name: checkout additional plugins
-      if: github.dependent-plugins != ''
+      if: inputs.dependent-plugins != ''
       shell: bash
       run: ${{ github.action_path }}/scripts/bash/checkout_dependent_plugins.sh
       working-directory: ${{ github.workspace }}/matomo
       env:
-        DEPENDENT_PLUGINS: ${{ github.dependent-plugins }}
+        DEPENDENT_PLUGINS: ${{ inputs.dependent-plugins }}
 
     - name: Run tests
       working-directory: ${{ github.workspace }}/matomo

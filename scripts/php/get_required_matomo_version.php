@@ -71,7 +71,7 @@ function getMinVersion(array $requiredVersions)
 
 function getMaxVersion(array $requiredVersions)
 {
-    $maxVersion = '';
+    $maxVersion = $devBranch = '';
 
     foreach ($requiredVersions as $required) {
         $comparison = $required['comparison'];
@@ -82,20 +82,25 @@ function getMaxVersion(array $requiredVersions)
             continue;
         } elseif ($comparison == '<' && $version == '4.0.0-b1') {
             $maxVersion = trim(file_get_contents('https://api.matomo.org/1.0/getLatestVersion/?release_channel=latest_3x_beta'));
+            $devBranch = '3.x-dev';
             continue;
         } elseif ($comparison == '<' && $version == '5.0.0-b1') {
             $maxVersion = trim(file_get_contents('https://api.matomo.org/1.0/getLatestVersion/?release_channel=latest_4x_beta'));
+            $devBranch = '4.x-dev';
             continue;
         } elseif ($comparison == '<' && $version == '6.0.0-b1') {
             $maxVersion = trim(file_get_contents('https://api.matomo.org/1.0/getLatestVersion/?release_channel=latest_5x_beta'));
+            $devBranch = '5.x-dev';
             continue;
         }
 
         if (in_array($comparison, ['<', '<=', '=='])) {
             if (empty($maxVersion)) {
-                $maxVersion = $version;
+                $maxVersion = $devBranch ?: $version;
             } elseif (version_compare($version, $maxVersion, '>=')) {
                 $maxVersion = $version;
+            } elseif ($devBranch) {
+                $maxVersion = $devBranch;
             }
         }
     }
