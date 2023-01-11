@@ -8,7 +8,7 @@ username = root
 password =
 dbname = matomo_tests
 adapter = PDO_MYSQL
-; no table prefix for tests on travis
+; no table prefix for tests on github
 tables_prefix =
 ;charset = utf8
 
@@ -21,7 +21,7 @@ username = root
 password =
 dbname = matomo_tests
 adapter = PDO_MYSQL
-; no table prefix for tests on travis
+; no table prefix for tests on github
 tables_prefix =
 
 [log]

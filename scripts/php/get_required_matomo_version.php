@@ -24,7 +24,7 @@ function getRequiredMatomoVersions($pluginJsonContents, $returnAlsoInvalid = fal
 
     $requiredVersions = explode(',', $requiredMatomoVersion);
 
-    $versions = array();
+    $versions = [];
     foreach ($requiredVersions as $required) {
         if (preg_match('{^(<>|!=|>=?|<=?|==?)\s*(.*)}', $required, $matches)) {
             $comparison = trim($matches[1]);
@@ -39,10 +39,10 @@ function getRequiredMatomoVersions($pluginJsonContents, $returnAlsoInvalid = fal
                 continue;
             }
 
-            $versions[] = array(
+            $versions[] = [
                 'comparison' => $comparison,
                 'version' => $version
-            );
+            ];
         }
     }
 
@@ -57,7 +57,7 @@ function getMinVersion(array $requiredVersions)
         $comparison = $required['comparison'];
         $version    = $required['version'];
 
-        if (in_array($comparison, array('>=','>', '=='))) {
+        if (in_array($comparison, ['>=','>', '=='])) {
             if (empty($minVersion)) {
                 $minVersion = $version;
             } elseif (version_compare($version, $minVersion, '<=')) {
@@ -91,7 +91,7 @@ function getMaxVersion(array $requiredVersions)
             continue;
         }
 
-        if (in_array($comparison, array('<', '<=', '=='))) {
+        if (in_array($comparison, ['<', '<=', '=='])) {
             if (empty($maxVersion)) {
                 $maxVersion = $version;
             } elseif (version_compare($version, $maxVersion, '>=')) {
@@ -106,7 +106,7 @@ function getMaxVersion(array $requiredVersions)
 // at this point in travis the plugin to test against is not in the piwik directory. we could move it to piwik
 // beforehand, but for plugins that are also stored as submodules, this would erase the plugin or fail when git
 // submodule update is called
-$pluginJsonPath     = "$pathToMatomo/$pluginName/plugin.json";
+$pluginJsonPath     = "$pathToMatomo/plugins/$pluginName/plugin.json";
 $pluginJsonContents = file_get_contents($pluginJsonPath);
 $pluginJsonContents = json_decode($pluginJsonContents, true);
 
