@@ -22,13 +22,14 @@ then
   git fetch -q --all
   cd $WORKSPACE/matomo
 
+  $ACTION_PATH/scripts/bash/checkout_test_against_branch.sh
+
   echo -e "${GREEN}Remove existing plugin (for submodules)${SET}"
   sudo rm -rf $WORKSPACE/matomo/plugins/$PLUGIN_NAME
 
   echo -e "${GREEN}Move checked out plugin to plugins directory${SET}"
   sudo mv ../$PLUGIN_NAME plugins
 
-  $ACTION_PATH/scripts/bash/checkout_test_against_branch.sh
 fi
 
 if [ "$MATOMO_TEST_TARGET" = "UI" ];
