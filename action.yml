@@ -68,6 +68,11 @@ inputs:
     description: "token used to checkout dependent plugins. Only required if private repo needs to be checked out"
     required: false
     default: ''
+  upload-artifacts:
+    type: boolean
+    description: "defines if produced build artifacts should be uploaded or not. Only relevant for System, Plugins and UI tests"
+    required: false
+    default: false
 
 runs:
   using: "composite"
@@ -148,24 +153,16 @@ runs:
         PHPUNIT_EXTRA_OPTIONS: ${{ inputs.phpunit-test-options }}
         MYSQL_ADAPTER: ${{ inputs.mysql-driver }}
 
-    # system checks failed, upload expected xml and PDF
     - name: upload processed screenshots
-      if: failure() && (inputs.test-type == 'UI' || inputs.test-type == 'All' || inputs.test-type == 'PluginTests')
+      if: failure() && inputs.upload-artifacts == 'true' && (inputs.test-type == 'UI' || inputs.test-type == 'SystemTestsPlugins' || inputs.test-type == 'SystemTestsCore' || inputs.test-type == 'PluginTests')
       shell: bash
       run: ${{ github.action_path }}/scripts/bash/upload_artifacts.sh
       env:
         ARTIFACTS_PASS: ${{ inputs.artifact-pass }}
+        TEST_SUITE: ${{ inputs.test-type }}
+        PLUGIN_NAME: ${{ inputs.plugin-name }}
         GITHUB_REPO: ${{ github.repository }}
         GITHUB_BRANCH: ${{ github.head_ref || github.ref_name }}
         GITHUB_RUN_ID: ${{ github.run-id }}
         GITHUB_RUN_NUMBER: ${{ github.run-number }}
         WORKSPACE: ${{ github.workspace }}/matomo
-
-    - name: View UI failures
-      if: failure() && (inputs.test-type == 'UI' || inputs.test-type == 'All' || inputs.test-type == 'PluginTests')
-      shell: bash
-      run: ${{ github.action_path }}/scripts/bash/view_ui_failed.sh
-      env:
-        GITHUB_REPO: ${{ github.repository }}
-        GITHUB_BRANCH: ${{ github.head_ref || github.ref_name }}
-        GITHUB_RUN_ID: ${{ github.run-id }}
