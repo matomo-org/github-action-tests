@@ -3,7 +3,13 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 SET='\033[0m'
 
-url_base="https://builds-artifacts.matomo.org/build?auth_key=$ARTIFACTS_PASS&repo=$GITHUB_REPO&build_id=$GITHUB_RUN_ID&build_entity_id=$GITHUB_RUN_NUMBER&branch=$GITHUB_BRANCH&github=true"
+url_base="https://builds-artifacts.matomo.org/build?auth_key=$ARTIFACTS_PASS&repo=$GITHUB_REPO&build_id=$GITHUB_RUN_ID&build_entity_id=$GITHUB_RUN_NUMBER&branch=$GITHUB_BRANCH"
+
+if [ "$ARTIFACTS_PROTECTED" = "true" ];
+then
+    echo "Artifacts will be protected (premium plugin)..."
+    url_base="$url_base&protected=1"
+fi
 
 if [ "$TEST_SUITE" = "UI" ];
 then
@@ -62,4 +68,4 @@ echo -e "${GREEN}Uploading Finished...${SET}"
 echo ""
 echo -e "${GREEN}You can download or view the processed artifacts here:${GREEN}"
 echo ""
-echo -e "${GREEN}https://builds-artifacts.matomo.org/github/$GITHUB_REPO/$GITHUB_BRANCH/$GITHUB_RUN_ID/${SET}"
+echo -e "${GREEN}https://builds-artifacts.matomo.org/$GITHUB_REPO/$GITHUB_BRANCH/$GITHUB_RUN_ID/${SET}"

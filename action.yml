@@ -19,9 +19,14 @@ inputs:
   run-number:
     description: "GitHub run number"
     required: false
-  artifact-pass:
+  artifacts-pass:
     description: "UI upload pass"
     required: false
+  artifacts-protected:
+    type: boolean
+    description: "protect uploaded artifacts"
+    required: false
+    default: false
   plugin-name:
     description: "name"
     required: false
@@ -158,7 +163,8 @@ runs:
       shell: bash
       run: ${{ github.action_path }}/scripts/bash/upload_artifacts.sh
       env:
-        ARTIFACTS_PASS: ${{ inputs.artifact-pass }}
+        ARTIFACTS_PASS: ${{ inputs.artifacts-pass }}
+        ARTIFACTS_PROTECTED: ${{ inputs.artifacts-protected == 'true' }}
         TEST_SUITE: ${{ inputs.test-type }}
         PLUGIN_NAME: ${{ inputs.plugin-name }}
         GITHUB_REPO: ${{ github.repository }}
