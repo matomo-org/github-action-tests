@@ -126,6 +126,29 @@ runs:
         node-version: ${{ inputs.node-version }}
 
     # setup apache etc
+    - name: checkout matomo for plugin builds
+      shell: bash
+      run: ${{ github.action_path }}/scripts/bash/checkout_matomo.sh
+      if: inputs.plugin-name != ''
+      env:
+        PLUGIN_NAME: ${{ inputs.plugin-name }}
+        WORKSPACE: ${{ github.workspace }}
+        ACTION_PATH: ${{ github.action_path }}
+
+    - name: Get composer cache directory
+      id: composer-cache
+      shell: bash
+      run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
+      working-directory: ${{ github.workspace }}/matomo
+
+    - name: Cache dependencies
+      uses: actions/cache@v3
+      with:
+        path: ${{ steps.composer-cache.outputs.dir }}
+        key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
+        restore-keys: ${{ runner.os }}-composer-${{ inputs.php-version }}
+
+    # setup apache etc
     - name: prepare setup
       shell: bash
       run: ${{ github.action_path }}/scripts/bash/prepare.sh
