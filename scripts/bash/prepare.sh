@@ -79,14 +79,11 @@ else
   sudo cp $ACTION_PATH/artifacts/www.conf /etc/php/$PHP_VERSION/fpm/pool.d/
   sudo systemctl reload php$PHP_VERSION-fpm.service
   sudo systemctl restart php$PHP_VERSION-fpm.service
-  sudo systemctl enable nginx
-  sudo systemctl start nginx
   sudo sed -i "s!{VersionNumber}!$PHP_VERSION!g" $ACTION_PATH/artifacts/ui_nginx.conf
   sudo sed -i "s!{WORKSPACE}!$WORKSPACE/matomo!g" $ACTION_PATH/artifacts/ui_nginx.conf
-  sudo cp $ACTION_PATH/artifacts/ui_nginx.conf /etc/nginx/conf.d/
+  sudo nginx -c $ACTION_PATH/artifacts/ui_nginx.conf
   sudo unlink /etc/nginx/sites-enabled/default
-  sudo systemctl reload nginx
-  sudo systemctl restart nginx
+  sudo systemctl status nginx.service
 fi
 
 if [ "$MATOMO_TEST_TARGET" = "UI" ];

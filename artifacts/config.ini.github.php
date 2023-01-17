@@ -1,6 +1,6 @@
 ; <?php exit; ?> DO NOT REMOVE THIS LINE
 ; This configuration is used for automatic integration
-; tests on Github Action. Do not use this in production.
+; tests on GitHub Action. Do not use this in production.
 
 [database]
 host = 127.0.0.1
@@ -8,7 +8,7 @@ username = root
 password =
 dbname = matomo_tests
 adapter = PDO_MYSQL
-; no table prefix for tests on github
+; no table prefix for tests on GitHub
 tables_prefix =
 ;charset = utf8
 
@@ -21,7 +21,7 @@ username = root
 password =
 dbname = matomo_tests
 adapter = PDO_MYSQL
-; no table prefix for tests on github
+; no table prefix for tests on GitHub
 tables_prefix =
 
 [log]
