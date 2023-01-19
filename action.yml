@@ -78,6 +78,10 @@ inputs:
     description: "defines if produced build artifacts should be uploaded or not. Only relevant for System, Plugins and UI tests"
     required: false
     default: false
+  setup-script:
+    description: "additional setup script to run before starting tests"
+    required: false
+    default: ''
 
 runs:
   using: "composite"
@@ -169,6 +173,12 @@ runs:
       env:
         DEPENDENT_PLUGINS: ${{ inputs.dependent-plugins }}
         GITHUB_USER_TOKEN: ${{ inputs.github-token }}
+
+    - name: run additional setup script
+      if: inputs.setup-script != ''
+      shell: bash
+      run: ${{ github.workspace }}/${{ inputs.setup-script }}
+      working-directory: ${{ github.workspace }}/matomo
 
     - name: Run tests
       working-directory: ${{ github.workspace }}/matomo
