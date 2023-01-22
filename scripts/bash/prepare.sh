@@ -32,6 +32,8 @@ fi
 
 cd $WORKSPACE/matomo
 echo -e "${GREEN}composer install${SET}"
+# prevents possible error with older Matomo releases, that doesn't include that config
+composer config --no-plugins allow-plugins.dealerdirect/phpcodesniffer-composer-installer false
 composer install --ignore-platform-reqs
 
 #php 8.1 require unitTest > 9
