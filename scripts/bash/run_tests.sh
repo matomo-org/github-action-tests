@@ -13,17 +13,26 @@ then
 
     if [ "$TEST_SUITE" = "Client" ]
     then
+      status=0
       if [ -d "tests/angularjs" ]
       then
         echo -e "${GREEN}Running angularjs tests${SET}"
         cd tests/angularjs
         npm install
         ./node_modules/karma/bin/karma start karma.conf.js --browsers ChromeHeadless --single-run
+        status=$?
+        echo "Returned status $status"
         cd ../..
       fi
       echo -e "${GREEN}Running vue tests${SET}"
       npm install
       npm test
+      vuestatus=$?
+      echo "Returned status $vuestatus"
+      if [ $status -ne 0 ]; then
+        exit $status
+      fi;
+      exit $vuestatus
     elif [ "$TEST_SUITE" = "JS" ]
     then
       ./console tests:run-js --matomo-url='http://localhost'
