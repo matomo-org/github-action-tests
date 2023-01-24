@@ -65,7 +65,7 @@ else
 fi
 
 # if just js tests, running php -S otherwise use php fpm
-if [ "$MATOMO_TEST_TARGET" = "JS" ] || [ "$MATOMO_TEST_TARGET" = "Angular" ];
+if [ "$MATOMO_TEST_TARGET" = "JS" ] || [ "$MATOMO_TEST_TARGET" = "Client" ];
 then
   cd $WORKSPACE/matomo
   echo -e "${GREEN}start php on 80${SET}"
