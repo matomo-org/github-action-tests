@@ -125,6 +125,8 @@ runs:
       uses: actions/setup-node@v3
       with:
         node-version: ${{ inputs.node-version }}
+        cache: 'npm'
+        cache-dependency-path: '**/package-lock.json'
 
     # setup apache etc
     - name: checkout matomo for plugin builds
