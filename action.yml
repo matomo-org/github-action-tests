@@ -121,12 +121,19 @@ runs:
         coverage: none
 
     - name: Setup Node
-      if: inputs.node-version != ''
+      if: inputs.node-version != '' && inputs.plugin-name == ''
       uses: actions/setup-node@v3
       with:
         node-version: ${{ inputs.node-version }}
         cache: 'npm'
         cache-dependency-path: '**/package-lock.json'
+
+    # Caching doesn't work for plugins as older Matomo releases might not have contained a lock file
+    - name: Setup Node
+      if: inputs.node-version != '' && inputs.plugin-name != ''
+      uses: actions/setup-node@v3
+      with:
+        node-version: ${{ inputs.node-version }}
 
     # setup apache etc
     - name: checkout matomo for plugin builds

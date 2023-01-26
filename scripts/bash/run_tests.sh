@@ -14,7 +14,7 @@ if [ -n "$TEST_SUITE" ]; then
     if [ -d "tests/angularjs" ]; then
       echo -e "${GREEN}Running angularjs tests${SET}"
       cd tests/angularjs
-      npm ci
+      npm install
       ./node_modules/karma/bin/karma start karma.conf.js --browsers ChromeHeadless --single-run
       status=$?
       echo "Returned status $status"
