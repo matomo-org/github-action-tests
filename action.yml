@@ -1,9 +1,9 @@
 name: 'Matomo Tests'
-description: 'Running Matomo Tests'
+description: 'Runs Matomo Tests'
 inputs:
   test-type:
     type: choice
-    description: "test type"
+    description: "Type of tests to run"
     required: true
     options:
       - UI
@@ -15,10 +15,7 @@ inputs:
       - SystemTestsCore
       - IntegrationTestsCore
       - IntegrationTestsPlugins
-    default: PHP
-  run-number:
-    description: "GitHub run number"
-    required: false
+    default: PluginTests
   artifacts-pass:
     description: "UI upload pass"
     required: false
@@ -28,10 +25,10 @@ inputs:
     required: false
     default: false
   plugin-name:
-    description: "name"
+    description: "Name of the plugin to test"
     required: false
   mysql-driver:
-    description: "Mysql driver"
+    description: "Mysql driver to use for testing. (Will be placed as config.ini.php setting)"
     required: false
     options:
       - PDO_MYSQL
@@ -44,42 +41,42 @@ inputs:
     description: "Additional options to run PHPUnit with"
     required: false
   php-version:
-    description: '7.2-8.1'
+    description: 'PHP version to set up for testing. Can be any version supported by shivammathur/setup-php'
     required: true
     default: ''
   node-version:
-    description: 'node version'
+    description: 'Node version to set up for testing'
     required: false
     default: ''
   redis-service:
     type: boolean
-    description: "require redis services"
+    description: "If true a redis master and sentinel will be set up before testing"
     required: false
     default: false
   mysql-service:
     type: boolean
-    description: "require mysql services"
+    description: "If true a MySQL 5.7 will be set up"
     required: false
     default: true
   matomo-test-branch:
-    description: "branch or tag of Matomo to run plugin tests for"
+    description: "Branch or tag name of Matomo to run plugin tests for. This can be either a specific name or maximum_supported_matomo or minimum_required_matomo."
     required: false
     default: ''
   dependent-plugins:
-    description: "additional plugins to checkout before testing. comma separated list of github slugs. e.g. matomo-org/pluginTasksTimetable"
+    description: "Additional plugins to checkout before testing. comma separated list of github slugs. e.g. matomo-org/pluginTasksTimetable"
     required: false
     default: ''
   github-token:
-    description: "token used to checkout dependent plugins. Only required if private repo needs to be checked out"
+    description: "Token used to checkout dependent plugins. Only required if private repo needs to be checked out"
     required: false
     default: ''
   upload-artifacts:
     type: boolean
-    description: "defines if produced build artifacts should be uploaded or not. Only relevant for System, Plugins and UI tests"
+    description: "Defines if produced build artifacts should be uploaded or not. Only relevant for System, Plugins and UI tests"
     required: false
     default: false
   setup-script:
-    description: "additional setup script to run before starting tests"
+    description: "Additional setup script to run before starting tests. Can be used by plugin to e.g. set up LDAP or similar."
     required: false
     default: ''
 
