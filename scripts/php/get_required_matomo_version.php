@@ -2,12 +2,12 @@
 /**
  * Matomo - free/libre analytics platform
  *
- * @link https://matomo.org
+ * @link    https://matomo.org
  * @license http://www.gnu.org/licenses/gpl-3.0.html GPL v3 or later
  */
 
-$pathToMatomo = $argv[1];
-$pluginName = $argv[2];
+$pathToMatomo     = $argv[1];
+$pluginName       = $argv[2];
 $returnMaxVersion = !empty($argv[3]) && $argv[3] === 'max';
 
 // tiny script to get plugin version from plugin.json from a bash script
@@ -17,9 +17,11 @@ function getRequiredMatomoVersions($pluginJsonContents, bool $returnAlsoInvalid 
 {
     $requiredMatomoVersion = '';
     if (isset($pluginJsonContents["require"]["piwik"])) {
-        $requiredMatomoVersion = (string) $pluginJsonContents["require"]["piwik"];
-    } else if (isset($pluginJsonContents["require"]["matomo"])) {
-        $requiredMatomoVersion = (string) $pluginJsonContents["require"]["matomo"];
+        $requiredMatomoVersion = (string)$pluginJsonContents["require"]["piwik"];
+    } else {
+        if (isset($pluginJsonContents["require"]["matomo"])) {
+            $requiredMatomoVersion = (string)$pluginJsonContents["require"]["matomo"];
+        }
     }
 
     $requiredVersions = explode(',', $requiredMatomoVersion);
@@ -28,7 +30,7 @@ function getRequiredMatomoVersions($pluginJsonContents, bool $returnAlsoInvalid 
     foreach ($requiredVersions as $required) {
         if (preg_match('{^(<>|!=|>=?|<=?|==?)\s*(.*)}', $required, $matches)) {
             $comparison = trim($matches[1]);
-            $version = $matches[2];
+            $version    = $matches[2];
 
             if (!preg_match("/^[^0-9]*(.*)/", $version) || empty($version)) {
                 // not a valid version number
@@ -41,7 +43,7 @@ function getRequiredMatomoVersions($pluginJsonContents, bool $returnAlsoInvalid 
 
             $versions[] = [
                 'comparison' => $comparison,
-                'version' => $version
+                'version'    => $version,
             ];
         }
     }
@@ -57,7 +59,7 @@ function getMinVersion(array $requiredVersions)
         $comparison = $required['comparison'];
         $version    = $required['version'];
 
-        if (in_array($comparison, ['>=','>', '=='])) {
+        if (in_array($comparison, ['>=', '>', '=='])) {
             if (empty($minVersion)) {
                 $minVersion = $version;
                 break;
@@ -83,9 +85,13 @@ function getMaxVersion(array $requiredVersions): string
         }
 
         if ($comparison == '<' && preg_match('/^[2-9]\.0\.0-b1$/', $version)) {
-            $majorVersion = (int) substr($version, 0, 1) - 1;
-            $maxVersion = trim(file_get_contents('https://api.matomo.org/1.0/getLatestVersion/?release_channel=latest_' . $majorVersion . 'x_beta'));
-            $devBranch = $majorVersion . '.x-dev';
+            $majorVersion = (int)substr($version, 0, 1) - 1;
+            $maxVersion   = trim(
+                file_get_contents(
+                    'https://api.matomo.org/1.0/getLatestVersion/?release_channel=latest_' . $majorVersion . 'x_beta'
+                )
+            );
+            $devBranch    = $majorVersion . '.x-dev';
 
             if (empty($maxVersion) || !version_compare($version, $maxVersion, '<=')) {
                 // use dev branch if the latest released version is covered by the supported version
@@ -107,7 +113,7 @@ $pluginJsonPath     = "$pathToMatomo/../$pluginName/plugin.json";
 $pluginJsonContents = file_get_contents($pluginJsonPath);
 $pluginJsonContents = json_decode($pluginJsonContents, true);
 
-$allRequiredVersions = getRequiredMatomoVersions($pluginJsonContents, true);
+$allRequiredVersions   = getRequiredMatomoVersions($pluginJsonContents, true);
 $validRequiredVersions = getRequiredMatomoVersions($pluginJsonContents, true);
 
 if ($returnMaxVersion) {
@@ -115,7 +121,7 @@ if ($returnMaxVersion) {
 
     if (empty($versionToReturn)) {
         // if no upper bound found, use the dev branch of the minimum required version, as we assume plugins are never compatible with next major release
-        $minVersion = getMinVersion($validRequiredVersions);
+        $minVersion      = getMinVersion($validRequiredVersions);
         $versionToReturn = substr($minVersion, 0, 1) . '.x-dev';
     }
 } else {
@@ -124,8 +130,8 @@ if ($returnMaxVersion) {
 
 if (empty($versionToReturn)) {
     $requiredVersions = $allRequiredVersions;
-    $versionToReturn = getMinVersion($requiredVersions);
-    $versionToReturn = !empty($versionToReturn) ? $versionToReturn : '4.x-dev';
+    $versionToReturn  = getMinVersion($requiredVersions);
+    $versionToReturn  = !empty($versionToReturn) ? $versionToReturn : '4.x-dev';
 }
 
 echo $versionToReturn;

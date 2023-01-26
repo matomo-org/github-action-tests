@@ -6,8 +6,7 @@ SET='\033[0m'
 
 shopt -s extglob
 
-if [ "$PLUGIN_NAME" != '' ]
-then
+if [ "$PLUGIN_NAME" != '' ]; then
   echo -e "${GREEN}Prepare directory for plugin tests ${SET}"
 
   echo -e "${GREEN}Move plugin content to directory${SET}"

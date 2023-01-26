@@ -8,12 +8,10 @@ shopt -s extglob
 
 echo -e "${GREEN}Using workspace path $WORKSPACE ${SET}"
 
-if [ "$MATOMO_TEST_TARGET" = "UI" ];
-then
+if [ "$MATOMO_TEST_TARGET" = "UI" ]; then
   cd $WORKSPACE/matomo
   git lfs pull --exclude=
-  if [ "$PLUGIN_NAME" != '' ]
-  then
+  if [ "$PLUGIN_NAME" != '' ]; then
     cd $WORKSPACE/matomo/plugins/$PLUGIN_NAME
     git lfs pull --exclude=
   fi
@@ -37,18 +35,16 @@ composer config --no-plugins allow-plugins.dealerdirect/phpcodesniffer-composer-
 composer install --ignore-platform-reqs
 
 #php 8.1 require unitTest > 9
-if [ "$PHP_VERSION" = "8.1" ] || [ "$PHP_VERSION" = "8.2" ];
-then
+if [ "$PHP_VERSION" = "8.1" ] || [ "$PHP_VERSION" = "8.2" ]; then
   composer remove --dev phpunit/phpunit
   composer require --dev phpunit/phpunit ~9.3 --ignore-platform-reqs
 fi
 
 # setup config
-sed "s/PDO_MYSQL/$MYSQL_ADAPTER/g" $ACTION_PATH/artifacts/config.ini.github.php > config/config.ini.php
+sed "s/PDO_MYSQL/$MYSQL_ADAPTER/g" $ACTION_PATH/artifacts/config.ini.github.php >config/config.ini.php
 
 # setup js and phpunit.xml
-if [ "$MATOMO_TEST_TARGET" = "UI" ] || [ "$MATOMO_TEST_TARGET" = "JS" ];
-then
+if [ "$MATOMO_TEST_TARGET" = "UI" ] || [ "$MATOMO_TEST_TARGET" = "JS" ]; then
   echo -e "${GREEN}installing node/puppeteer${SET}"
   cd $WORKSPACE/matomo/tests/lib/screenshot-testing
   npm ci
@@ -58,15 +54,13 @@ then
   mkdir -p ./tests/UI/processed-ui-screenshots
 else
   cp ./tests/PHPUnit/phpunit.xml.dist ./tests/PHPUnit/phpunit.xml
-  if [ -n "$PLUGIN_NAME" ];
-  then
-    sed -n '/<filter>/{p;:a;N;/<\/filter>/!ba;s/.*\n/<whitelist addUncoveredFilesFromWhitelist=\"true\">\n<directory suffix=\".php\">..\/..\/plugins\/'$PLUGIN_NAME'<\/directory>\n<exclude>\n<directory suffix=\".php\">..\/..\/plugins\/'$PLUGIN_NAME'\/tests<\/directory>\n<directory suffix=\".php\">..\/..\/plugins\/'$PLUGIN_NAME'\/Test<\/directory>\n<directory suffix=\".php\">..\/..\/plugins\/'$PLUGIN_NAME'\/Updates<\/directory>\n<\/exclude>\n<\/whitelist>\n/};p' ./tests/PHPUnit/phpunit.xml > ./tests/PHPUnit/phpunit.xml.new && mv ./tests/PHPUnit/phpunit.xml.new ./tests/PHPUnit/phpunit.xml
-  fi;
+  if [ -n "$PLUGIN_NAME" ]; then
+    sed -n '/<filter>/{p;:a;N;/<\/filter>/!ba;s/.*\n/<whitelist addUncoveredFilesFromWhitelist=\"true\">\n<directory suffix=\".php\">..\/..\/plugins\/'$PLUGIN_NAME'<\/directory>\n<exclude>\n<directory suffix=\".php\">..\/..\/plugins\/'$PLUGIN_NAME'\/tests<\/directory>\n<directory suffix=\".php\">..\/..\/plugins\/'$PLUGIN_NAME'\/Test<\/directory>\n<directory suffix=\".php\">..\/..\/plugins\/'$PLUGIN_NAME'\/Updates<\/directory>\n<\/exclude>\n<\/whitelist>\n/};p' ./tests/PHPUnit/phpunit.xml >./tests/PHPUnit/phpunit.xml.new && mv ./tests/PHPUnit/phpunit.xml.new ./tests/PHPUnit/phpunit.xml
+  fi
 fi
 
 # if just js tests, running php -S otherwise use php fpm
-if [ "$MATOMO_TEST_TARGET" = "JS" ] || [ "$MATOMO_TEST_TARGET" = "Client" ];
-then
+if [ "$MATOMO_TEST_TARGET" = "JS" ] || [ "$MATOMO_TEST_TARGET" = "Client" ]; then
   cd $WORKSPACE/matomo
   echo -e "${GREEN}start php on 80${SET}"
   sudo setcap CAP_NET_BIND_SERVICE=+eip $(readlink -f $(which php))
@@ -88,8 +82,7 @@ else
   sudo systemctl status nginx.service
 fi
 
-if [ "$MATOMO_TEST_TARGET" = "UI" ];
-then
+if [ "$MATOMO_TEST_TARGET" = "UI" ]; then
   echo -e "${GREEN}update chrome driver${SET}"
   sudo apt-get update
   sudo apt-get --only-upgrade install google-chrome-stable
