@@ -51,7 +51,7 @@ if [ "$MATOMO_TEST_TARGET" = "UI" ] || [ "$MATOMO_TEST_TARGET" = "JS" ];
 then
   echo -e "${GREEN}installing node/puppeteer${SET}"
   cd $WORKSPACE/matomo/tests/lib/screenshot-testing
-  npm install
+  npm ci
   cd $WORKSPACE/matomo
   cp ./tests/UI/config.dist.js ./tests/UI/config.js
   chmod a+rw ./tests/lib/geoip-files || true

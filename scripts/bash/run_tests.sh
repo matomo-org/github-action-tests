@@ -18,14 +18,14 @@ then
       then
         echo -e "${GREEN}Running angularjs tests${SET}"
         cd tests/angularjs
-        npm install
+        npm ci
         ./node_modules/karma/bin/karma start karma.conf.js --browsers ChromeHeadless --single-run
         status=$?
         echo "Returned status $status"
         cd ../..
       fi
       echo -e "${GREEN}Running vue tests${SET}"
-      npm install
+      npm ci
       npm test
       vuestatus=$?
       echo "Returned status $vuestatus"
