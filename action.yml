@@ -106,7 +106,7 @@ runs:
         php-version: ${{ inputs.php-version }}
         extensions: bcmath, ldap, curl, zip, pdo_mysql, mysqli, gd, redis, zlib, opcache
         ini-values: |
-          post_max_size=8M
+          post_max_size=8M,
           memory_limit=768M,
           max_execution_time=10000,
           always_populate_raw_post_data=-1,
@@ -114,8 +114,8 @@ runs:
           log_errors=on,
           display_errors=on,
           allow_url_fopen=on,
-          zend.exception_ignore_args=Off
-          mysqli.allow_local_infile=On
+          zend.exception_ignore_args=Off,
+          mysqli.allow_local_infile=On,
           opcache.enable=0
         tools: composer:v2
         coverage: none
