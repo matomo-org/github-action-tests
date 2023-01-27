@@ -8,7 +8,7 @@ shopt -s extglob
 
 echo -e "${GREEN}Using workspace path $WORKSPACE ${SET}"
 
-if [ "$MATOMO_TEST_TARGET" = "UI" ]; then
+if [ "$TEST_SUITE" = "UI" ]; then
   cd $WORKSPACE/matomo
   git lfs pull --exclude=
   if [ "$PLUGIN_NAME" != '' ]; then
@@ -43,8 +43,13 @@ fi
 # setup config
 sed "s/PDO_MYSQL/$MYSQL_ADAPTER/g" $ACTION_PATH/artifacts/config.ini.github.php >config/config.ini.php
 
+# for plugin builds on minimal required matomo version disable deprecation notices
+if [ "$PLUGIN_NAME" != '' ] && [ "$MATOMO_TEST_TARGET" == "minimum_required_matomo" ]; then
+  sed -i -E "s/error_reporting\(.*\)/error_reporting(E_ALL \& ~E_DEPRECATED)/g" core/bootstrap.php
+fi
+
 # setup js and phpunit.xml
-if [ "$MATOMO_TEST_TARGET" = "UI" ] || [ "$MATOMO_TEST_TARGET" = "JS" ]; then
+if [ "$TEST_SUITE" = "UI" ] || [ "$TEST_SUITE" = "JS" ]; then
   echo -e "${GREEN}installing node/puppeteer${SET}"
   cd $WORKSPACE/matomo/tests/lib/screenshot-testing
   npm ci
@@ -60,7 +65,7 @@ else
 fi
 
 # if just js tests, running php -S otherwise use php fpm
-if [ "$MATOMO_TEST_TARGET" = "JS" ] || [ "$MATOMO_TEST_TARGET" = "Client" ]; then
+if [ "$TEST_SUITE" = "JS" ] || [ "$TEST_SUITE" = "Client" ]; then
   cd $WORKSPACE/matomo
   echo -e "${GREEN}start php on 80${SET}"
   sudo setcap CAP_NET_BIND_SERVICE=+eip $(readlink -f $(which php))
@@ -82,7 +87,7 @@ else
   sudo systemctl status nginx.service
 fi
 
-if [ "$MATOMO_TEST_TARGET" = "UI" ]; then
+if [ "$TEST_SUITE" = "UI" ]; then
   echo -e "${GREEN}update chrome driver${SET}"
   sudo apt-get update
   sudo apt-get --only-upgrade install google-chrome-stable

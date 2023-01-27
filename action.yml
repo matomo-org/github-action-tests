@@ -165,7 +165,8 @@ runs:
       run: ${{ github.action_path }}/scripts/bash/prepare.sh
       env:
         PHP_VERSION: ${{ inputs.php-version }}
-        MATOMO_TEST_TARGET: ${{ inputs.test-type }}
+        TEST_SUITE: ${{ inputs.test-type }}
+        MATOMO_TEST_TARGET: ${{ inputs.matomo-test-branch }}
         MYSQL_ADAPTER: ${{ inputs.mysql-driver }}
         PLUGIN_NAME: ${{ inputs.plugin-name }}
         WORKSPACE: ${{ github.workspace }}
