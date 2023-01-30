@@ -63,7 +63,7 @@ inputs:
     required: false
     default: ''
   dependent-plugins:
-    description: "Additional plugins to checkout before testing. comma separated list of github slugs. e.g. matomo-org/pluginTasksTimetable"
+    description: "Additional plugins to checkout before testing. space separated list of github slugs. e.g. matomo-org/pluginTasksTimetable"
     required: false
     default: ''
   github-token:

@@ -8,14 +8,17 @@ else
   echo "Cloning dependent plugins..."
   echo ""
   PLUGINS=($DEPENDENT_PLUGINS)
-  for pluginSlug in $PLUGINS; do
+  for pluginSlug in ${PLUGINS[@]}; do
     dependentPluginName=$(echo "$pluginSlug" | sed -E 's/[a-zA-Z0-9_-]+\/[a-zA-Z0-9_]+-(.*)/\1/')
 
     echo "Cloning $pluginSlug into plugins/$dependentPluginName..."
+
+    rm -rf "plugins/$dependentPluginName"
+
     if [ "$GITHUB_USER_TOKEN" == "" ]; then
       git clone --depth=1 "https://github.com/$pluginSlug" "plugins/$dependentPluginName"
     else
-      git clone --depth=1 "https://$GITHUB_USER_TOKEN:@github.com/$pluginSlug" "plugins/$dependentPluginName" 2>&1 | sed "s/$GITHUB_USER_TOKEN/GITHUB_USER_TOKEN/"
+      git clone --depth=1 "https://$GITHUB_USER_TOKEN:@github.com/$pluginSlug" "plugins/$dependentPluginName"
     fi
 
     rm -rf "plugins/$dependentPluginName/tests/Integration"
