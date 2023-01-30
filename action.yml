@@ -197,6 +197,7 @@ runs:
         UITEST_EXTRA_OPTIONS: ${{ inputs.ui-test-options }}
         PHPUNIT_EXTRA_OPTIONS: ${{ inputs.phpunit-test-options }}
         MYSQL_ADAPTER: ${{ inputs.mysql-driver }}
+        TRAVIS: '1'
 
     - name: upload processed screenshots
       if: failure() && inputs.upload-artifacts == 'true' && (inputs.test-type == 'UI' || inputs.test-type == 'SystemTestsPlugins' || inputs.test-type == 'SystemTestsCore' || inputs.test-type == 'PluginTests')
