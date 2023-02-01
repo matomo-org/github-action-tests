@@ -3,17 +3,17 @@
 if [[ "$MATOMO_TEST_TARGET" == "minimum_required_matomo" && "$PLUGIN_NAME" != "" ]]; then # test against the minimum required Matomo in the plugin.json file
   export MATOMO_TEST_TARGET=$(php "$ACTION_PATH/scripts/php/get_required_matomo_version.php" $WORKSPACE/matomo $PLUGIN_NAME)
 
-  if ! git rev-parse "$MATOMO_TEST_TARGET" >/dev/null 2>&1; then
-    if git rev-parse "${MATOMO_TEST_TARGET%-*}" >/dev/null 2>&1; then
-      echo "Could not find tag '$MATOMO_TEST_TARGET' specified in plugin.json, testing against ${MATOMO_TEST_TARGET%-*}."
+  if ! git ls-remote --exit-code origin "$MATOMO_TEST_TARGET" >/dev/null 2>&1; then
+    if git ls-remote --exit-code origin "${MATOMO_TEST_TARGET%-*}" >/dev/null 2>&1; then
+      echo "Could not find beta version '$MATOMO_TEST_TARGET' specified in plugin.json, testing against stable ${MATOMO_TEST_TARGET%-*}."
 
       export MATOMO_TEST_TARGET=${MATOMO_TEST_TARGET%-*}
-    elif ! git rev-parse "${MATOMO_TEST_TARGET:0:1}.x-dev" >/dev/null 2>&1; then
-      echo "Could not find tag '$MATOMO_TEST_TARGET' specified in plugin.json, testing against 4.x-dev."
+    elif ! git ls-remote --exit-code origin "${MATOMO_TEST_TARGET:0:1}.x-dev" >/dev/null 2>&1; then
+      echo "Could not find development branch '${MATOMO_TEST_TARGET:0:1}.x-dev' for '$MATOMO_TEST_TARGET' specified in plugin.json, testing against 4.x-dev."
 
       export MATOMO_TEST_TARGET=4.x-dev
     else
-      echo "Could not find tag '$MATOMO_TEST_TARGET' specified in plugin.json, testing against ${MATOMO_TEST_TARGET:0:1}.x-dev."
+      echo "Could not find tag '$MATOMO_TEST_TARGET' specified in plugin.json, testing against development branch ${MATOMO_TEST_TARGET:0:1}.x-dev."
 
       export MATOMO_TEST_TARGET=${MATOMO_TEST_TARGET:0:1}.x-dev
     fi
@@ -21,13 +21,13 @@ if [[ "$MATOMO_TEST_TARGET" == "minimum_required_matomo" && "$PLUGIN_NAME" != ""
 elif [[ "$MATOMO_TEST_TARGET" == "maximum_supported_matomo" && "$PLUGIN_NAME" != "" ]]; then # test against the maximum supported Matomo in the plugin.json file
   export MATOMO_TEST_TARGET=$(php "$ACTION_PATH/scripts/php/get_required_matomo_version.php" $WORKSPACE/matomo $PLUGIN_NAME "max")
 
-  if ! git rev-parse "$MATOMO_TEST_TARGET" >/dev/null 2>&1; then
-    if ! git rev-parse "${MATOMO_TEST_TARGET:0:1}.x-dev" >/dev/null 2>&1; then
-      echo "Could not find tag '$MATOMO_TEST_TARGET' specified in plugin.json, testing against 4.x-dev."
+  if ! git ls-remote --exit-code origin "$MATOMO_TEST_TARGET" >/dev/null 2>&1; then
+    if ! git ls-remote --exit-code origin "${MATOMO_TEST_TARGET:0:1}.x-dev" >/dev/null 2>&1; then
+      echo "Could not find development branch '${MATOMO_TEST_TARGET:0:1}.x-dev' for '$MATOMO_TEST_TARGET' specified in plugin.json, testing against 4.x-dev."
 
       export MATOMO_TEST_TARGET=4.x-dev
     else
-      echo "Could not find tag '$MATOMO_TEST_TARGET' specified in plugin.json, testing against ${MATOMO_TEST_TARGET:0:1}.x-dev."
+      echo "Could not find tag '$MATOMO_TEST_TARGET' specified in plugin.json, testing against development branch ${MATOMO_TEST_TARGET:0:1}.x-dev."
 
       export MATOMO_TEST_TARGET=${MATOMO_TEST_TARGET:0:1}.x-dev
     fi

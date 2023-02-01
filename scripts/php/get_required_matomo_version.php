@@ -100,6 +100,9 @@ function getMaxVersion(array $requiredVersions): string
                 // otherwise use the version defined in plugin json, as newer versions might no longer work
                 return $version;
             }
+        } else {
+            // otherwise use the version defined in plugin json, as newer versions might no longer work
+            return $version;
         }
     }
 
