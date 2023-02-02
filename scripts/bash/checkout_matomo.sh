@@ -21,6 +21,7 @@ if [ "$PLUGIN_NAME" != '' ]; then
 
   export PLUGIN_NAME
   export MATOMO_TEST_TARGET
+  export TEST_SUITE
   export ACTION_PATH
   export WORKSPACE
 

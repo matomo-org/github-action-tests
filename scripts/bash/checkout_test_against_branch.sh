@@ -34,6 +34,11 @@ elif [[ "$MATOMO_TEST_TARGET" == "maximum_supported_matomo" && "$PLUGIN_NAME" !=
   fi
 fi
 
+if [[ "$TEST_SUITE" == "JS" && ! $MATOMO_TEST_TARGET =~ ^[0-9]\.x-dev$ && $(php -r "echo (int) version_compare('$MATOMO_TEST_TARGET', '4.3.0', '<');") == "1" ]]; then
+  echo "JavaScript tests can't run on Matomo < 4.3.0, so switching to 4.3.0 instead."
+  export MATOMO_TEST_TARGET=4.3.0
+fi
+
 echo "Testing against '$MATOMO_TEST_TARGET'"
 git reset --hard
 if ! git checkout "$MATOMO_TEST_TARGET" --force; then

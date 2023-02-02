@@ -147,6 +147,7 @@ runs:
         WORKSPACE: ${{ github.workspace }}
         ACTION_PATH: ${{ github.action_path }}
         MATOMO_TEST_TARGET: ${{ inputs.matomo-test-branch }}
+        TEST_SUITE: ${{ inputs.test-type }}
 
     - name: Get composer cache directory
       id: composer-cache
