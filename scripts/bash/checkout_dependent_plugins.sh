@@ -21,6 +21,13 @@ else
       git clone --depth=1 "https://$GITHUB_USER_TOKEN:@github.com/$pluginSlug" "plugins/$dependentPluginName"
     fi
 
+    if [[ $TARGET_BRANCH =~ ^[0-9]\.x-dev$ ]]; then
+      cd plugins/$dependentPluginName
+      git fetch origin $TARGET_BRANCH || true
+      git checkout FETCH_HEAD || true
+      cd ../..
+    fi
+
     rm -rf "plugins/$dependentPluginName/tests/Integration"
     rm -rf "plugins/$dependentPluginName/Test/Integration"
     rm -rf "plugins/$dependentPluginName/tests/Unit"

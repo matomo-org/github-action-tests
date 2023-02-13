@@ -181,6 +181,7 @@ runs:
       env:
         DEPENDENT_PLUGINS: ${{ inputs.dependent-plugins }}
         GITHUB_USER_TOKEN: ${{ inputs.github-token }}
+        TARGET_BRANCH: ${{ github.base_ref || github.ref_name }}
 
     - name: run additional setup script
       if: inputs.setup-script != ''
