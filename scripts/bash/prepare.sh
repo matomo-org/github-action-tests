@@ -6,6 +6,8 @@ SET='\033[0m'
 
 shopt -s extglob
 
+echo "::group::Setup test environment"
+
 echo -e "${GREEN}Using workspace path $WORKSPACE ${SET}"
 
 if [ "$TEST_SUITE" = "UI" ]; then
@@ -119,3 +121,5 @@ sudo chmod -R 777 $WORKSPACE/matomo/tmp
 sudo chmod -R 777 $WORKSPACE/matomo/tmp/assets
 sudo chmod -R 777 $WORKSPACE/matomo/tmp/templates_c
 sudo chmod -R 777 $WORKSPACE/matomo/tests/UI
+
+echo "::endgroup::"

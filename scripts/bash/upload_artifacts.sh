@@ -21,20 +21,22 @@ if [ "$TEST_SUITE" = "UI" ]; then
     cd "$WORKSPACE/tests/UI"
   fi
 
-  echo "[NOTE] Uploading processed screenshots:"
+  echo "::group::Uploading processed screenshots:"
   ls processed-ui-screenshots
   echo ""
   tar --exclude='.gitkeep' -cjf processed-ui-screenshots.tar.bz2 processed-ui-screenshots
   curl -X POST --data-binary @processed-ui-screenshots.tar.bz2 "$url_base&artifact_name=processed-screenshots"
+  echo "::endgroup::"
 
   # upload diff tarball if it exists
   cd $WORKSPACE/tests/UI
   if [ -d "./screenshot-diffs" ]; then
-    echo "[NOTE] Uploading following diffs:"
+    echo "::group::Uploading following diffs:"
     ls screenshot-diffs
 
     tar -cjf screenshot-diffs.tar.bz2 screenshot-diffs
     curl -X POST --data-binary @screenshot-diffs.tar.bz2 "$url_base&artifact_name=screenshot-diffs"
+    echo "::endgroup::"
   fi
 fi
 

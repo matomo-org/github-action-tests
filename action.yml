@@ -112,6 +112,7 @@ runs:
           always_populate_raw_post_data=-1,
           error_reporting=E_ALL,
           log_errors=on,
+          error_log=${{ github.workspace }}/php-errors.log,
           display_errors=on,
           allow_url_fopen=on,
           zend.exception_ignore_args=Off,
@@ -208,6 +209,21 @@ runs:
         GITHUB_BRANCH: ${{ github.head_ref || github.ref_name }}
         MYSQL_ADAPTER: ${{ inputs.mysql-driver }}
         TRAVIS: '1'
+
+    - name: Debug informations
+      if: always()
+      working-directory: ${{ github.workspace }}/matomo
+      shell: bash
+      run: |
+        echo "::group::PHP configuration"
+        php -i || true
+        echo "::endgroup::"
+        echo "::group::Matomo error log file"
+        cat tmp/logs/matomo.log || true
+        echo "::endgroup::"
+        echo "::group::PHP error log file"
+        cat ${{ github.workspace }}/php-errors.log || true
+        echo "::endgroup::"
 
     - name: upload processed screenshots
       if: failure() && inputs.upload-artifacts == 'true' && (inputs.test-type == 'UI' || inputs.test-type == 'SystemTestsPlugins' || inputs.test-type == 'SystemTestsCore' || inputs.test-type == 'PluginTests')
