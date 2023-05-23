@@ -226,7 +226,7 @@ runs:
         echo "::endgroup::"
 
     - name: upload processed screenshots
-      if: inputs.upload-artifacts == 'true' && (inputs.test-type == 'UI' || inputs.test-type == 'SystemTestsPlugins' || inputs.test-type == 'SystemTestsCore' || inputs.test-type == 'PluginTests')
+      if: always() && inputs.upload-artifacts == 'true' && (inputs.test-type == 'UI' || inputs.test-type == 'SystemTestsPlugins' || inputs.test-type == 'SystemTestsCore' || inputs.test-type == 'PluginTests')
       shell: bash
       run: ${{ github.action_path }}/scripts/bash/upload_artifacts.sh
       env:
