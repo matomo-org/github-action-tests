@@ -25,7 +25,14 @@ else
       REPO="https://$GITHUB_USER_TOKEN:@github.com/$pluginSlug"
     fi
     
-    git clone --depth=1 $REPO "plugins/$dependentPluginName" || (echo "Failed to checkout plugin. Skipping."; continue)
+    CHECKOUTERROR=false
+    
+    git clone --depth=1 $REPO "plugins/$dependentPluginName" || CHECKOUTERROR=true
+    
+    if [ $CHECKOUTERROR ]; then
+        echo "Failed to checkout $pluginSlug. Skipping."
+        continue
+    fi
 
     if [[ $TARGET_BRANCH =~ ^[0-9]\.x-dev$ ]]; then
       cd plugins/$dependentPluginName
