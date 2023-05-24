@@ -29,7 +29,7 @@ else
     
     git clone --depth=1 $REPO "plugins/$dependentPluginName" || CHECKOUTERROR=true
     
-    if [ $CHECKOUTERROR ]; then
+    if [ "$CHECKOUTERROR" = true ]; then
         echo "Failed to checkout $pluginSlug. Skipping."
         continue
     fi
