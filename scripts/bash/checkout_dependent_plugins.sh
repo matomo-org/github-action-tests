@@ -11,15 +11,21 @@ else
   for pluginSlug in ${PLUGINS[@]}; do
     dependentPluginName=$(echo "$pluginSlug" | sed -E 's/[a-zA-Z0-9_-]+\/[a-zA-Z0-9_]+-(.*)/\1/')
 
+    if [ "$dependentPluginName" == "" ]; then
+        continue
+    fi
+
     echo "Cloning $pluginSlug into plugins/$dependentPluginName..."
 
     rm -rf "plugins/$dependentPluginName"
 
     if [ "$GITHUB_USER_TOKEN" == "" ]; then
-      git clone --depth=1 "https://github.com/$pluginSlug" "plugins/$dependentPluginName"
+      REPO="https://github.com/$pluginSlug"
     else
-      git clone --depth=1 "https://$GITHUB_USER_TOKEN:@github.com/$pluginSlug" "plugins/$dependentPluginName"
+      REPO="https://$GITHUB_USER_TOKEN:@github.com/$pluginSlug"
     fi
+    
+    git clone --depth=1 $REPO "plugins/$dependentPluginName" || (echo "Failed to checkout plugin. Skipping."; continue)
 
     if [[ $TARGET_BRANCH =~ ^[0-9]\.x-dev$ ]]; then
       cd plugins/$dependentPluginName
