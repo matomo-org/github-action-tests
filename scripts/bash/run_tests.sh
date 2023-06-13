@@ -30,7 +30,11 @@ if [ -n "$TEST_SUITE" ]; then
     fi
     exit $vuestatus
   elif [ "$TEST_SUITE" = "JS" ]; then
-    ./console tests:run-js --matomo-url='http://localhost'
+    if [ -n "$PLUGIN_NAME" ]; then
+      ./console tests:run-js --matomo-url='http://localhost' --plugin=$PLUGIN_NAME
+    else
+      ./console tests:run-js --matomo-url='http://localhost'
+    fi
   elif [ "$TEST_SUITE" = "UI" ]; then
     if [ -n "$PLUGIN_NAME" ]; then
       ./console tests:run-ui --persist-fixture-data --assume-artifacts --plugin=$PLUGIN_NAME --extra-options="$UITEST_EXTRA_OPTIONS"
