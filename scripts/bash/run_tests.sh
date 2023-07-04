@@ -31,7 +31,11 @@ if [ -n "$TEST_SUITE" ]; then
     exit $vuestatus
   elif [ "$TEST_SUITE" = "JS" ]; then
     if [ -n "$PLUGIN_NAME" ]; then
-      ./console tests:run-js --matomo-url='http://localhost' --plugin=$PLUGIN_NAME
+      if [ $(php -r "require_once './core/Version.php'; echo (int)version_compare(\Piwik\Version::VERSION, '5.0.0-b1', '<');") -eq 1 ]; then
+        ./console tests:run-js --matomo-url='http://localhost' # --plugin option not supported pre matomo 5 versions
+      else
+        ./console tests:run-js --matomo-url='http://localhost' --plugin=$PLUGIN_NAME
+      fi
     else
       ./console tests:run-js --matomo-url='http://localhost'
     fi
