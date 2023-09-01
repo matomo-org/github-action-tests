@@ -41,6 +41,10 @@ if [ "$PHP_VERSION" = "8.1" ] || [ "$PHP_VERSION" = "8.2" ]; then
   composer remove --dev phpunit/phpunit
   composer require --dev phpunit/phpunit ~9.3 --ignore-platform-reqs
 fi
+if [ "$PHP_VERSION" = "8.3" ]; then
+  composer remove --dev phpunit/phpunit
+  composer require --dev phpunit/phpunit ~10.3 --ignore-platform-reqs
+fi
 
 # setup config
 sed "s/PDO_MYSQL/$MYSQL_ADAPTER/g" $ACTION_PATH/artifacts/config.ini.github.php >config/config.ini.php
