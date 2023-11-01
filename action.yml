@@ -79,6 +79,10 @@ inputs:
     description: "Additional setup script to run before starting tests. Can be used by plugin to e.g. set up LDAP or similar."
     required: false
     default: ''
+  testomatio:
+    description: "To enable Testomat.io reporter for tests, Testomat.io token should be set via this input"
+    required: false
+    default: ''
 
 runs:
   using: "composite"
@@ -208,6 +212,7 @@ runs:
         PHPUNIT_EXTRA_OPTIONS: ${{ inputs.phpunit-test-options }}
         GITHUB_BRANCH: ${{ github.head_ref || github.ref_name }}
         MYSQL_ADAPTER: ${{ inputs.mysql-driver }}
+        TESTOMATIO: ${{ inputs.testomatio }}
         TRAVIS: '1'
 
     - name: Debug informations
