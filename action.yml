@@ -213,6 +213,7 @@ runs:
         GITHUB_BRANCH: ${{ github.head_ref || github.ref_name }}
         MYSQL_ADAPTER: ${{ inputs.mysql-driver }}
         TESTOMATIO: ${{ inputs.testomatio }}
+        TESTOMATIO_CREATE: 1
         TRAVIS: '1'
 
     - name: Debug informations
