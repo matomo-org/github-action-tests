@@ -142,6 +142,7 @@ runs:
 
     - name: "Add PHPUnit matcher"
       if: inputs.test-type != 'UI' && inputs.test-type != 'JS' && inputs.test-type != 'Client'
+      shell: bash
       run: echo "::add-matcher::${{ runner.tool_cache }}/phpunit.json"
 
     # setup apache etc
