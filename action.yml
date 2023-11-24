@@ -140,6 +140,10 @@ runs:
       with:
         node-version: ${{ inputs.node-version }}
 
+    - name: "Add PHPUnit matcher"
+      if: inputs.test-type != 'UI' && inputs.test-type != 'JS' && inputs.test-type != 'Client'
+      run: echo "::add-matcher::${{ runner.tool_cache }}/phpunit.json"
+
     # setup apache etc
     - name: checkout matomo for plugin builds
       shell: bash
