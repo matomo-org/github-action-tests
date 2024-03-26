@@ -206,6 +206,12 @@ runs:
         WORKSPACE: ${{ github.workspace }}
         ACTION_PATH: ${{ github.action_path }}
 
+    - name: Install package ripgrep
+      if: inputs.plugin-name != ''
+      shell: bash
+      run: sudo apt-get install ripgrep
+      working-directory: ${{ github.workspace }}/matomo
+
     - name: Run tests
       working-directory: ${{ github.workspace }}/matomo
       shell: bash
