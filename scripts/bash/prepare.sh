@@ -43,7 +43,7 @@ if [ "$PHP_VERSION" = "8.1" ] || [ "$PHP_VERSION" = "8.2" ] || [ "$PHP_VERSION" 
 fi
 
 # setup config
-sed "s/PDO_MYSQL/$MYSQL_ADAPTER/g; s/schema = Mysql/schema = $MYSQL_SCHEMA/g" $ACTION_PATH/artifacts/config.ini.github.php >config/config.ini.php
+sed "s/PDO_MYSQL/$MYSQL_ADAPTER/g; s/schema = Mysql/schema = $MYSQL_ENGINE/g" $ACTION_PATH/artifacts/config.ini.github.php >config/config.ini.php
 
 # for plugin builds on minimal required matomo version disable deprecation notices
 if [ "$PLUGIN_NAME" != '' ] && [ "$MATOMO_TEST_TARGET" == "minimum_required_matomo" ]; then
