@@ -9,6 +9,7 @@ password =
 ; we need to use piwik_tests here, as otherwise tests will fail for Matomo 4 versions before the rename
 dbname = piwik_tests
 adapter = PDO_MYSQL
+schema = Mysql
 ; no table prefix for tests on GitHub
 tables_prefix =
 ;charset = utf8
@@ -23,6 +24,7 @@ username = root
 password =
 dbname = piwik_tests
 adapter = PDO_MYSQL
+schema = Mysql
 ; no table prefix for tests on GitHub
 tables_prefix =
 

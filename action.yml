@@ -55,9 +55,16 @@ inputs:
     default: false
   mysql-service:
     type: boolean
-    description: "If true a MySQL 5.7 will be set up"
+    description: "If true a MySQL engine will be set up. "
     required: false
     default: true
+  mysql-engine:
+    description: "MySQL database engine to use. Can be 'Mysql' or 'Mariadb'"
+    options:
+      - Mysql
+      - Mariadb
+    required: false
+    default: 'Mysql'
   matomo-test-branch:
     description: "Branch or tag name of Matomo to run plugin tests for. This can be either a specific name or maximum_supported_matomo or minimum_required_matomo."
     required: false
@@ -89,10 +96,18 @@ runs:
   steps:
 
     - name: start mysql services
-      if: inputs.mysql-service == 'true'
+      if: inputs.mysql-service == 'true' && inputs.mysql-engine == 'Mysql'
       shell: bash
       run: |
         docker run -d --tmpfs /var/lib/mysql:rw --tmpfs /bitnami/mysql/data:rw -v ${{ github.action_path }}/artifacts/my.cnf:/opt/bitnami/mysql/conf/my_custom.cnf:ro --name mysql -p 3306:3306 -e ALLOW_EMPTY_PASSWORD=yes -e MYSQL_DATABASE=matomo_tests bitnami/mysql:5.7
+        sleep 10
+        mysql -h127.0.0.1 -uroot -e "SET GLOBAL sql_mode = 'NO_ENGINE_SUBSTITUTION,STRICT_TRANS_TABLES';SET GLOBAL wait_timeout = 36000;SET GLOBAL max_allowed_packet = 134209536;"
+
+    - name: start mariadb services
+      if: inputs.mysql-service == 'true' && inputs.mysql-engine == 'Mariadb'
+      shell: bash
+      run: |
+        docker run -d --tmpfs /var/lib/mariadb:rw --tmpfs /bitnami/mariadb/data:rw -v ${{ github.action_path }}/artifacts/my.cnf:/opt/bitnami/mariadb/conf/my_custom.cnf:ro --name mariadb -p 3306:3306 -e ALLOW_EMPTY_PASSWORD=yes -e MARIADB_DATABASE=matomo_tests bitnami/mariadb:latest
         sleep 10
         mysql -h127.0.0.1 -uroot -e "SET GLOBAL sql_mode = 'NO_ENGINE_SUBSTITUTION,STRICT_TRANS_TABLES';SET GLOBAL wait_timeout = 36000;SET GLOBAL max_allowed_packet = 134209536;"
 
@@ -179,6 +194,7 @@ runs:
         TEST_SUITE: ${{ inputs.test-type }}
         MATOMO_TEST_TARGET: ${{ inputs.matomo-test-branch }}
         MYSQL_ADAPTER: ${{ inputs.mysql-driver }}
+        MYSQL_ENGINE: ${{ inputs.mysql-engine }}
         PLUGIN_NAME: ${{ inputs.plugin-name }}
         WORKSPACE: ${{ github.workspace }}
         ACTION_PATH: ${{ github.action_path }}
@@ -222,6 +238,7 @@ runs:
         PHPUNIT_EXTRA_OPTIONS: ${{ inputs.phpunit-test-options }}
         GITHUB_BRANCH: ${{ github.head_ref || github.ref_name }}
         MYSQL_ADAPTER: ${{ inputs.mysql-driver }}
+        MYSQL_ENGINE: ${{ inputs.mysql-engine }}
         TESTOMATIO: ${{ inputs.testomatio }}
         TESTOMATIO_CREATE: 1
         TRAVIS: '1'
