@@ -59,10 +59,11 @@ inputs:
     required: false
     default: true
   mysql-engine:
-    description: "MySQL database engine to use. Can be 'Mysql' or 'Mariadb'"
+    description: "MySQL database engine to use. Can be 'Mysql', 'Mariadb' or 'Tidb'"
     options:
       - Mysql
       - Mariadb
+      - Tidb
     required: false
     default: 'Mysql'
   matomo-test-branch:
@@ -110,6 +111,14 @@ runs:
         docker run -d --tmpfs /var/lib/mariadb:rw --tmpfs /bitnami/mariadb/data:rw -v ${{ github.action_path }}/artifacts/my.cnf:/opt/bitnami/mariadb/conf/my_custom.cnf:ro --name mariadb -p 3306:3306 -e ALLOW_EMPTY_PASSWORD=yes -e MARIADB_DATABASE=matomo_tests bitnami/mariadb:latest
         sleep 10
         mysql -h127.0.0.1 -uroot -e "SET GLOBAL sql_mode = 'NO_ENGINE_SUBSTITUTION,STRICT_TRANS_TABLES';SET GLOBAL wait_timeout = 36000;SET GLOBAL max_allowed_packet = 134209536;"
+
+    - name: start tidb services
+      if: inputs.mysql-service == 'true' && inputs.mysql-engine == 'Tidb'
+      shell: bash
+      run: |
+        docker run -d -p 3306:4000 pingcap/tidb:latest
+        sleep 10
+        mysql -h127.0.0.1 -uroot -e "SET GLOBAL sql_mode = 'NO_ENGINE_SUBSTITUTION,STRICT_TRANS_TABLES';SET GLOBAL wait_timeout = 36000;SET GLOBAL max_allowed_packet = 134209536;CREATE DATABASE matomo_tests;"
 
     - name: start redis serivces
       if: inputs.redis-service == 'true'
