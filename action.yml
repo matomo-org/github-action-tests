@@ -118,7 +118,7 @@ runs:
       run: |
         docker run -d -p 3306:4000 pingcap/tidb:latest
         sleep 10
-        mysql -h127.0.0.1 -uroot -e "SET GLOBAL sql_mode = 'NO_ENGINE_SUBSTITUTION,STRICT_TRANS_TABLES';SET GLOBAL wait_timeout = 36000;SET GLOBAL max_allowed_packet = 134209536;CREATE DATABASE matomo_tests;"
+        mysql -h127.0.0.1 -uroot -e "SET GLOBAL sql_mode = 'NO_ENGINE_SUBSTITUTION,STRICT_TRANS_TABLES';SET GLOBAL wait_timeout = 36000;SET GLOBAL max_allowed_packet = 134209536;CREATE DATABASE matomo_tests DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;"
 
     - name: start redis serivces
       if: inputs.redis-service == 'true'
