@@ -63,7 +63,7 @@ if [ -n "$TEST_SUITE" ]; then
     fi
 
     if [ ! -v "$TESTOMATIO" ]; then
-      npm install @testomatio/reporter --save-dev
+      npm install @testomatio/reporter
       npx report-xml "results.xml" --lang php
     fi
 
