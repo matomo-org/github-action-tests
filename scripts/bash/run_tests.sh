@@ -46,6 +46,10 @@ if [ -n "$TEST_SUITE" ]; then
       ./console tests:run-ui --store-in-ui-tests-repo --persist-fixture-data --assume-artifacts --core --extra-options="$UITEST_EXTRA_OPTIONS"
     fi
   else
+    if [[ ! -v $TESTOMATIO ]]
+      PHPUNIT_EXTRA_OPTIONS="$PHPUNIT_EXTRA_OPTIONS --log-junit results.xml"
+    fi
+
     if [ -n "$PLUGIN_NAME" ]; then
       if [ -d "plugins/$PLUGIN_NAME/Test" ]; then
         ./vendor/phpunit/phpunit/phpunit --configuration ./tests/PHPUnit/phpunit.xml --colors --testsuite $TEST_SUITE $PHPUNIT_EXTRA_OPTIONS plugins/$PLUGIN_NAME/Test/ | tee phpunit.out
@@ -58,8 +62,9 @@ if [ -n "$TEST_SUITE" ]; then
       ./vendor/phpunit/phpunit/phpunit --configuration ./tests/PHPUnit/phpunit.xml --testsuite $TEST_SUITE --colors $PHPUNIT_EXTRA_OPTIONS | tee phpunit.out
     fi
 
-    npm install @testomatio/reporter --save-dev
-    DEBUG=@testomatio/reporter:pipe:testomatio npx report-xml "results.xml" --lang php
+    if [[ ! -v $TESTOMATIO ]]
+      npx report-xml "results.xml" --lang php
+    fi
 
     exit_code="${PIPESTATUS[0]}"
     if [ "$exit_code" -ne "0" ]; then
