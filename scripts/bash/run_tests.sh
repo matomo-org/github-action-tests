@@ -59,7 +59,7 @@ if [ -n "$TEST_SUITE" ]; then
     fi
 
     npm install @testomatio/reporter --save-dev
-    npx report-xml "report.xml" --lang php
+    npx report-xml "results.xml" --lang php
 
     exit_code="${PIPESTATUS[0]}"
     if [ "$exit_code" -ne "0" ]; then
