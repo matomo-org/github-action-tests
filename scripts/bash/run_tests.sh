@@ -58,6 +58,9 @@ if [ -n "$TEST_SUITE" ]; then
       ./vendor/phpunit/phpunit/phpunit --configuration ./tests/PHPUnit/phpunit.xml --testsuite $TEST_SUITE --colors $PHPUNIT_EXTRA_OPTIONS | tee phpunit.out
     fi
 
+    npm install @testomatio/reporter --save-dev
+    npx report-xml "report.xml" --lang php
+
     exit_code="${PIPESTATUS[0]}"
     if [ "$exit_code" -ne "0" ]; then
       exit $exit_code
