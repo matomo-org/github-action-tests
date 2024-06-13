@@ -250,6 +250,7 @@ runs:
         MYSQL_ENGINE: ${{ inputs.mysql-engine }}
         TESTOMATIO: ${{ inputs.testomatio }}
         TESTOMATIO_CREATE: 1
+        TESTOMATIO_ENV: ${{ inputs.php-version }}, ${{ inputs.mysql-driver }}, ${{ inputs.mysql-engine }}
         TRAVIS: '1'
 
     - name: Debug informations
