@@ -246,7 +246,7 @@ runs:
         UITEST_EXTRA_OPTIONS: ${{ inputs.ui-test-options }}
         PHPUNIT_EXTRA_OPTIONS: ${{ inputs.phpunit-test-options }}
         GITHUB_BRANCH: ${{ github.head_ref || github.ref_name }}
-        GITHUB_IS_TRIGGERED_BY_PUSH: ${{ github.event_name == 'push' && 'false' || 'true' }}
+        GITHUB_IS_TRIGGERED_BY_PUSH: ${{ github.event_name == 'push' && 'true' || 'false' }}
         MYSQL_ADAPTER: ${{ inputs.mysql-driver }}
         MYSQL_ENGINE: ${{ inputs.mysql-engine }}
         TESTOMATIO: ${{ inputs.testomatio }}
