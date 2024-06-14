@@ -3,6 +3,20 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 SET='\033[0m'
 
+function should_report_to_testomatio {
+  if [ -v "$TESTOMATIO" ]; then
+    return 1 # Return false
+  fi
+  if [ "$GITHUB_IS_PULL_REQUEST" == "true" ]; then
+    return 1  # Return false
+  fi
+  if [ "$TEST_SUITE" == "UnitTests" ]; then
+    return 1 # Return false
+  fi
+
+  return 0  # Return true
+}
+
 if [ -n "$TEST_SUITE" ]; then
   echo -e "${GREEN}Executing tests in test suite $TEST_SUITE...${SET}"
   if [ -n "$PLUGIN_NAME" ]; then
@@ -46,7 +60,7 @@ if [ -n "$TEST_SUITE" ]; then
       ./console tests:run-ui --store-in-ui-tests-repo --persist-fixture-data --assume-artifacts --core --extra-options="$UITEST_EXTRA_OPTIONS"
     fi
   else
-    if [ ! -v "$TESTOMATIO" ]; then
+    if should_report_to_testomatio; then
       PHPUNIT_EXTRA_OPTIONS="$PHPUNIT_EXTRA_OPTIONS --log-junit results.xml"
     fi
 
@@ -62,7 +76,7 @@ if [ -n "$TEST_SUITE" ]; then
       ./vendor/phpunit/phpunit/phpunit --configuration ./tests/PHPUnit/phpunit.xml --testsuite $TEST_SUITE --colors $PHPUNIT_EXTRA_OPTIONS | tee phpunit.out
     fi
 
-    if [ ! -v "$TESTOMATIO" ]; then
+    if should_report_to_testomatio; then
       npm install @testomatio/reporter
       npx report-xml "results.xml" --lang php
     fi
