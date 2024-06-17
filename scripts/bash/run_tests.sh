@@ -3,6 +3,27 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 SET='\033[0m'
 
+function should_report_to_testomatio {
+  if [ -v "$TESTOMATIO" ]; then
+    return 1 # Return false
+  fi
+  if [ "$GITHUB_IS_TRIGGERED_BY_PUSH" == "false" ]; then
+    return 1  # Return false
+  fi
+  if [ "$TEST_SUITE" == "UnitTests" ]; then
+    return 1 # Return false
+  fi
+
+  return 0  # Return true
+}
+
+should_report_to_testomatio
+if [ $? -eq 0 ]; then
+  SHOULD_SEND_TO_TESTOMATIO=true
+else
+  SHOULD_SEND_TO_TESTOMATIO=false
+fi
+
 if [ -n "$TEST_SUITE" ]; then
   echo -e "${GREEN}Executing tests in test suite $TEST_SUITE...${SET}"
   if [ -n "$PLUGIN_NAME" ]; then
@@ -46,6 +67,10 @@ if [ -n "$TEST_SUITE" ]; then
       ./console tests:run-ui --store-in-ui-tests-repo --persist-fixture-data --assume-artifacts --core --extra-options="$UITEST_EXTRA_OPTIONS"
     fi
   else
+    if [ "$SHOULD_SEND_TO_TESTOMATIO" == "true" ]; then
+      PHPUNIT_EXTRA_OPTIONS="$PHPUNIT_EXTRA_OPTIONS --log-junit results.xml"
+    fi
+
     if [ -n "$PLUGIN_NAME" ]; then
       if [ -d "plugins/$PLUGIN_NAME/Test" ]; then
         ./vendor/phpunit/phpunit/phpunit --configuration ./tests/PHPUnit/phpunit.xml --colors --testsuite $TEST_SUITE $PHPUNIT_EXTRA_OPTIONS plugins/$PLUGIN_NAME/Test/ | tee phpunit.out
@@ -59,6 +84,12 @@ if [ -n "$TEST_SUITE" ]; then
     fi
 
     exit_code="${PIPESTATUS[0]}"
+
+    if [ "$SHOULD_SEND_TO_TESTOMATIO" == "true" ]; then
+      npm install @testomatio/reporter
+      npx report-xml "results.xml" --lang php
+    fi
+
     if [ "$exit_code" -ne "0" ]; then
       exit $exit_code
     elif grep "No tests executed" phpunit.out; then
