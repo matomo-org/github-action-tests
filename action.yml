@@ -262,6 +262,9 @@ runs:
         echo "::group::PHP configuration"
         php -i || true
         echo "::endgroup::"
+        echo "::group::Matomo configuration file"
+        cat config/config.ini.php || true
+        echo "::endgroup::"
         echo "::group::Matomo error log file"
         cat tmp/logs/matomo.log || true
         echo "::endgroup::"
