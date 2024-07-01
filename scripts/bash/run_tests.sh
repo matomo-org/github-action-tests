@@ -21,7 +21,7 @@ should_report_to_testomatio
 if [ $? -eq 0 ]; then
   export SHOULD_SEND_TO_TESTOMATIO=true
 else
-  export SHOULD_SEND_TO_TESTOMATIO=true
+  export SHOULD_SEND_TO_TESTOMATIO=false
 fi
 
 if [ -n "$TEST_SUITE" ]; then
