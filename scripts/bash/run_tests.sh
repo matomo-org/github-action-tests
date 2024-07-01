@@ -19,9 +19,9 @@ function should_report_to_testomatio {
 
 should_report_to_testomatio
 if [ $? -eq 0 ]; then
-  SHOULD_SEND_TO_TESTOMATIO=true
+  export SHOULD_SEND_TO_TESTOMATIO=true
 else
-  SHOULD_SEND_TO_TESTOMATIO=false
+  export SHOULD_SEND_TO_TESTOMATIO=false
 fi
 
 if [ -n "$TEST_SUITE" ]; then
