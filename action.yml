@@ -116,8 +116,15 @@ runs:
       if: inputs.mysql-service == 'true' && inputs.mysql-engine == 'Tidb'
       shell: bash
       run: |
-        docker run -d -p 3306:4000 pingcap/tidb:latest
-        sleep 10
+        curl --proto '=https' --tlsv1.2 -sSf https://tiup-mirrors.pingcap.com/install.sh | sh
+
+        ${HOME}/.tiup/bin/tiup playground --host 0.0.0.0 --db.port 3306 --without-monitor &
+
+        while ! mysqladmin -h127.0.0.1 -uroot ping --silent; do
+          echo 'Waiting for TiDB to start...'
+          sleep 5
+        done
+
         mysql -h127.0.0.1 -uroot -e "SET GLOBAL sql_mode = 'NO_ENGINE_SUBSTITUTION,STRICT_TRANS_TABLES';SET GLOBAL wait_timeout = 36000;SET GLOBAL max_allowed_packet = 134209536;CREATE DATABASE matomo_tests;"
 
     - name: start redis serivces
