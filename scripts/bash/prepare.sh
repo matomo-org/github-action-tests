@@ -84,6 +84,7 @@ else
   sudo systemctl restart php$PHP_VERSION-fpm.service
   sudo sed -i "s!{VersionNumber}!$PHP_VERSION!g" $ACTION_PATH/artifacts/ui_nginx.conf
   sudo sed -i "s!{WORKSPACE}!$WORKSPACE/matomo!g" $ACTION_PATH/artifacts/ui_nginx.conf
+  sudo sed -i "s!{USER}!$USER!g" $ACTION_PATH/artifacts/ui_nginx.conf
   sudo nginx -c $ACTION_PATH/artifacts/ui_nginx.conf
   sudo unlink /etc/nginx/sites-enabled/default
   sudo systemctl status nginx.service
