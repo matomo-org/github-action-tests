@@ -122,6 +122,9 @@ sudo chmod -R 777 $WORKSPACE/matomo/tmp/assets
 sudo chmod -R 777 $WORKSPACE/matomo/tmp/templates_c
 sudo chmod -R 777 $WORKSPACE/matomo/tests/UI
 
+ps -eo user,comm | grep nginx
+
 ls -l $WORKSPACE
+ls -l $WORKSPACE/matomo
 
 echo "::endgroup::"
