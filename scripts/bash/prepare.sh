@@ -124,6 +124,8 @@ sudo chmod -R 777 $WORKSPACE/matomo/tests/UI
 
 ps -eo user,comm | grep nginx
 
+groups nginx
+
 ls -l $WORKSPACE
 ls -l $WORKSPACE/matomo
 
