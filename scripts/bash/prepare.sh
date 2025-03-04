@@ -122,4 +122,6 @@ sudo chmod -R 777 $WORKSPACE/matomo/tmp/assets
 sudo chmod -R 777 $WORKSPACE/matomo/tmp/templates_c
 sudo chmod -R 777 $WORKSPACE/matomo/tests/UI
 
+ls -l $WORKSPACE
+
 echo "::endgroup::"
