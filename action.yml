@@ -272,7 +272,7 @@ runs:
         cat ${{ github.workspace }}/php-errors.log || true
         echo "::endgroup::"
         echo "::group::Nginx error log file"
-        cat ${{ github.workspace }}/tmp/error.log || true
+        cat ${{ github.workspace }}/matomo/tmp/error.log || true
         echo "::endgroup::"
 
     - name: upload processed screenshots
