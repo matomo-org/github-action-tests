@@ -271,6 +271,9 @@ runs:
         echo "::group::PHP error log file"
         cat ${{ github.workspace }}/php-errors.log || true
         echo "::endgroup::"
+        echo "::group::Nginx error log file"
+        cat ${{ github.workspace }}/matomo/tmp/error.log || true
+        echo "::endgroup::"
 
     - name: upload processed screenshots
       if: always() && inputs.upload-artifacts == 'true' && (inputs.test-type == 'UI' || inputs.test-type == 'SystemTestsPlugins' || inputs.test-type == 'SystemTestsCore' || inputs.test-type == 'PluginTests')
