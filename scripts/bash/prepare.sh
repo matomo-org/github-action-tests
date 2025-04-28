@@ -22,7 +22,7 @@ if [ "$TEST_SUITE" = "UI" ]; then
   cp $ACTION_PATH/artifacts/fonts/* $HOME/.fonts
   fc-cache -f -v
   ls $HOME/.fonts
-  sudo apt-get update && sudo apt-get install -y imagemagick
+  sudo apt-get update --allow-releaseinfo-change-label && sudo apt-get install -y imagemagick
   sudo sed -i -E 's/name="memory" value="[^"]+"/name="memory" value="2GiB"/g' /etc/ImageMagick-6/policy.xml
   sudo sed -i -E 's/name="width" value="[^"]+"/name="width" value="64KP"/g' /etc/ImageMagick-6/policy.xml
   sudo sed -i -E 's/name="height" value="[^"]+"/name="height" value="64KP"/g' /etc/ImageMagick-6/policy.xml
