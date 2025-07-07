@@ -96,7 +96,7 @@ inputs:
     required: false
     default: ''
   testomatio-force-report:
-    description: "Flag for whether to force uploading a report to Testomat.io. This can be conditional based on the type of test and trigger."
+    description: "Flag for whether to force uploading a report to Testomat.io instead of just push events. Only applies if the 'testomatio' token is set."
     required: false
     default: false
 
