@@ -95,6 +95,10 @@ inputs:
     description: "To enable Testomat.io reporter for tests, Testomat.io token should be set via this input"
     required: false
     default: ''
+  testomatio-force-report:
+    description: "Flag for whether to force uploading a report to Testomat.io. This can be conditional based on the type of test and trigger."
+    required: false
+    default: false
 
 runs:
   using: "composite"
@@ -312,6 +316,7 @@ runs:
         MYSQL_VERSION: ${{ inputs.mysql-version }}
         TESTOMATIO: ${{ inputs.testomatio }}
         TESTOMATIO_CREATE: 1
+        TESTOMATIO_FORCE_REPORT: ${{ inputs.testomatio-force-report }}
         TESTOMATIO_ENV: PHP-${{ inputs.php-version }}, ${{ inputs.mysql-driver }}, ${{ inputs.mysql-engine }}
         TRAVIS: '1'
 

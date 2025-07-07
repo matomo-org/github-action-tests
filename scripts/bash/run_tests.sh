@@ -7,6 +7,9 @@ function should_report_to_testomatio {
   if [ -v "$TESTOMATIO" ]; then
     return 1 # Return false
   fi
+  if [ "$TESTOMATIO_FORCE_REPORT" == "true" ]; then
+    return 0 # Return true since the token is set and the test was marked as force
+  fi
   if [ "$GITHUB_IS_TRIGGERED_BY_PUSH" == "false" ]; then
     return 1  # Return false
   fi
