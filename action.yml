@@ -136,7 +136,7 @@ runs:
       shell: bash
       run: |
         docker run -d \
-          --tmpfs /var/lib/mariadb:rw \
+          --tmpfs /var/lib/mysql:rw \
           -v ${{ github.action_path }}/artifacts/my.cnf:/etc/mysql/conf.d/my_custom.cnf:ro \
           --name mariadb \
           -p 3306:3306 \
