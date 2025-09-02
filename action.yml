@@ -116,7 +116,7 @@ runs:
           -p 3306:3306 \
           -e ALLOW_EMPTY_PASSWORD=yes \
           -e MYSQL_DATABASE=matomo_tests \
-          bitnami/mysql:${{ inputs.mysql-version || '5.7' }}
+          mysql:${{ inputs.mysql-version || '5.7' }}
 
         for i in $(seq 1 30); do
           if mysqladmin ping -h127.0.0.1 -uroot --silent; then
@@ -144,7 +144,7 @@ runs:
           -p 3306:3306 \
           -e ALLOW_EMPTY_PASSWORD=yes \
           -e MARIADB_DATABASE=matomo_tests \
-          bitnami/mariadb:${{ inputs.mysql-version || 'latest' }}
+          mariadb:${{ inputs.mysql-version || 'latest' }}
 
         for i in $(seq 1 30); do
           if mysqladmin ping -h127.0.0.1 -uroot --silent; then
