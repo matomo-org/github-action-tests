@@ -19,12 +19,13 @@ if [ "$PLUGIN_NAME" != '' ]; then
 
   if [ "$GITHUB_USER_TOKEN" == "" ]; then
     REPO="https://github.com/matomo-org/matomo"
+    git clone -q --recurse-submodules ${REPO}
   else
-    REPO="https://$GITHUB_USER_TOKEN:@github.com/matomo-org/matomo"
+    git -c url."https://$GITHUB_USER_TOKEN:@github.com/".insteadOf="https://github.com/" \
+      clone --recurse-submodules https://$GITHUB_USER_TOKEN:@github.com/matomo-org/matomo
   fi
 
 
-  git clone -q --recurse-submodules ${REPO}
   git fetch -q --all
   cd $WORKSPACE/matomo
 
