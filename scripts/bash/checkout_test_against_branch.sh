@@ -57,3 +57,4 @@ fi
 echo "Initializing submodules"
 git submodule init -q
 git submodule update -q || true
+git lfs logs last
