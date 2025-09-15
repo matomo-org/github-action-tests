@@ -80,7 +80,7 @@ inputs:
     default: ''
   github-token:
     description: "Token used to checkout dependent plugins. Only required if private repo needs to be checked out"
-    required: false
+    required: true
     default: ''
   upload-artifacts:
     type: boolean
@@ -298,7 +298,7 @@ runs:
 
     - name: Install package ripgrep
       shell: bash
-      run: sudo apt-get install ripgrep
+      run: sudo apt-get -o Dpkg::Options::="--no-triggers" install ripgrip # Speed up installation by not building man pages
       working-directory: ${{ github.workspace }}/matomo
 
     - name: Run tests
