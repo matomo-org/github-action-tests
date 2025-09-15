@@ -58,3 +58,5 @@ echo "Initializing submodules"
 git submodule init -q
 git submodule update -q || true
 git lfs logs last
+ls /home/runner/work/plugin-CustomReports/plugin-CustomReports/matomo/.git/modules/plugins/TagManager/lfs/logs/
+cat /home/runner/work/plugin-CustomReports/plugin-CustomReports/matomo/.git/modules/plugins/TagManager/lfs/logs/*
