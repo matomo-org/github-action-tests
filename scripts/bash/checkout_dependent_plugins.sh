@@ -2,6 +2,8 @@
 
 # NOTE: should be removed when composer used to handle plugin dependencies
 
+set -x # trace commands
+
 if [ "$DEPENDENT_PLUGINS" == "" ]; then
   echo "No dependent plugins."
 else

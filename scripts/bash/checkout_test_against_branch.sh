@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -x          # trace commands
+
 if [[ "$MATOMO_TEST_TARGET" == "minimum_required_matomo" && "$PLUGIN_NAME" != "" ]]; then # test against the minimum required Matomo in the plugin.json file
   export MATOMO_TEST_TARGET=$(php "$ACTION_PATH/scripts/php/get_required_matomo_version.php" $WORKSPACE/matomo $PLUGIN_NAME)
 
