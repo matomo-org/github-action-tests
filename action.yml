@@ -95,6 +95,10 @@ inputs:
     description: "To enable Testomat.io reporter for tests, Testomat.io token should be set via this input"
     required: false
     default: ''
+  testomatio-force-report:
+    description: "Flag for whether to force uploading a report to Testomat.io instead of just push events. Only applies if the 'testomatio' token is set."
+    required: false
+    default: false
 
 runs:
   using: "composite"
@@ -106,13 +110,12 @@ runs:
       run: |
         docker run -d \
           --tmpfs /var/lib/mysql:rw \
-          --tmpfs /bitnami/mysql/data:rw \
-          -v ${{ github.action_path }}/artifacts/my.cnf:/opt/bitnami/mysql/conf/my_custom.cnf:ro \
+          -v ${{ github.action_path }}/artifacts/my.cnf:/etc/mysql/conf.d/my_custom.cnf:ro \
           --name mysql \
           -p 3306:3306 \
-          -e ALLOW_EMPTY_PASSWORD=yes \
+          -e MYSQL_ALLOW_EMPTY_PASSWORD=yes \
           -e MYSQL_DATABASE=matomo_tests \
-          bitnami/mysql:${{ inputs.mysql-version || '5.7' }}
+          mysql:${{ inputs.mysql-version || '5.7' }}
 
         for i in $(seq 1 30); do
           if mysqladmin ping -h127.0.0.1 -uroot --silent; then
@@ -133,14 +136,13 @@ runs:
       shell: bash
       run: |
         docker run -d \
-          --tmpfs /var/lib/mariadb:rw \
-          --tmpfs /bitnami/mariadb/data:rw \
-          -v ${{ github.action_path }}/artifacts/my.cnf:/opt/bitnami/mariadb/conf/my_custom.cnf:ro \
+          --tmpfs /var/lib/mysql:rw \
+          -v ${{ github.action_path }}/artifacts/my.cnf:/etc/mysql/conf.d/my_custom.cnf:ro \
           --name mariadb \
           -p 3306:3306 \
-          -e ALLOW_EMPTY_PASSWORD=yes \
+          -e MARIADB_ALLOW_EMPTY_ROOT_PASSWORD=1 \
           -e MARIADB_DATABASE=matomo_tests \
-          bitnami/mariadb:${{ inputs.mysql-version || 'latest' }}
+          mariadb:${{ inputs.mysql-version || 'latest' }}
 
         for i in $(seq 1 30); do
           if mysqladmin ping -h127.0.0.1 -uroot --silent; then
@@ -179,12 +181,12 @@ runs:
           CREATE DATABASE matomo_tests;
         "
 
-    - name: start redis serivces
+    - name: start redis services
       if: inputs.redis-service == 'true'
       shell: bash
       run: |
-        docker run -d --name redis -e ALLOW_EMPTY_PASSWORD=yes -p 6379:6379 bitnami/redis:latest
-        docker run -d --name mymaster -e REDIS_MASTER_HOST=localhost -p 26379:26379 bitnami/redis-sentinel:latest
+        docker run -d --name redis -e ALLOW_EMPTY_PASSWORD=yes -p 6379:6379 bitnamisecure/redis:latest
+        docker run -d --name mymaster -e REDIS_MASTER_HOST=localhost -p 26379:26379 bitnamisecure/redis-sentinel:latest
 
     - name: Setup PHP
       if: inputs.php-version != ''
@@ -250,8 +252,10 @@ runs:
       uses: actions/cache@v3
       with:
         path: ${{ steps.composer-cache.outputs.dir }}
-        key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
-        restore-keys: ${{ runner.os }}-composer-${{ inputs.php-version }}
+        key: ${{ runner.os }}-composer-${{ inputs.php-version }}-${{ hashFiles('**/composer.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-composer-${{ inputs.php-version }}
+          ${{ runner.os }}-composer
 
     # setup apache etc
     - name: prepare setup
@@ -312,6 +316,7 @@ runs:
         MYSQL_VERSION: ${{ inputs.mysql-version }}
         TESTOMATIO: ${{ inputs.testomatio }}
         TESTOMATIO_CREATE: 1
+        TESTOMATIO_FORCE_REPORT: ${{ inputs.testomatio-force-report }}
         TESTOMATIO_ENV: PHP-${{ inputs.php-version }}, ${{ inputs.mysql-driver }}, ${{ inputs.mysql-engine }}
         TRAVIS: '1'
 
