@@ -206,7 +206,8 @@ runs:
           allow_url_fopen=on,
           zend.exception_ignore_args=Off,
           mysqli.allow_local_infile=On,
-          opcache.enable=0
+          opcache.enable=0,
+          fatal_error_backtraces=Off
         tools: composer:v2
         coverage: none
 
