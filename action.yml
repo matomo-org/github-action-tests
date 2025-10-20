@@ -193,10 +193,10 @@ runs:
       shell: bash
       run: |
         case "${{ inputs.php-version }}" in
-          matomo_min_php)
+          matomo5_min_php)
             RESOLVED_VERSION="7.2"
             ;;
-          matomo_max_php)
+          matomo5_max_php)
             RESOLVED_VERSION="8.5"
             ;;
           '')

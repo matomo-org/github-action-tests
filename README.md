@@ -53,7 +53,7 @@ This action is able to run certain test suites for Matomo or any Matomo plugin.
 
     Defines the PHP version to set up for testing. (Not needed for Client tests)
 
-    Use `matomo_min_php` or `matomo_max_php` to resolve to the centrally managed (defined in action.yml) minimum or maximum PHP versions supported by Matomo tests.
+    Use `matomo5_min_php` or `matomo5_max_php` to resolve to the centrally managed (defined in action.yml) minimum or maximum PHP versions supported by Matomo tests.
 
     The action uses `shivammathur/setup-php` to set up PHP. You can find supported PHP versions here: https://github.com/shivammathur/setup-php#tada-php-support
 
