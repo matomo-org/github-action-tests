@@ -188,11 +188,32 @@ runs:
         docker run -d --name redis -e ALLOW_EMPTY_PASSWORD=yes -p 6379:6379 bitnamisecure/redis:latest
         docker run -d --name mymaster -e REDIS_MASTER_HOST=localhost -p 26379:26379 bitnamisecure/redis-sentinel:latest
 
+    - name: Resolve PHP version
+      id: resolve-php
+      shell: bash
+      run: |
+        case "${{ inputs.php-version }}" in
+          matomo_min_php)
+            RESOLVED_VERSION="7.2"
+            ;;
+          matomo_max_php)
+            RESOLVED_VERSION="8.5"
+            ;;
+          '')
+            exit 0
+            ;;
+          *)
+            RESOLVED_VERSION="${{ inputs.php-version }}"
+            ;;
+        esac
+
+        echo "version=$RESOLVED_VERSION" >> "$GITHUB_OUTPUT"
+
     - name: Setup PHP
-      if: inputs.php-version != ''
+      if: steps.resolve-php.outputs.version != ''
       uses: shivammathur/setup-php@v2
       with:
-        php-version: ${{ inputs.php-version }}
+        php-version: ${{ steps.resolve-php.outputs.version }}
         extensions: bcmath, ldap, curl, zip, pdo_mysql, mysqli, gd, redis, zlib, opcache
         ini-values: |
           post_max_size=8M,
@@ -253,9 +274,9 @@ runs:
       uses: actions/cache@v3
       with:
         path: ${{ steps.composer-cache.outputs.dir }}
-        key: ${{ runner.os }}-composer-${{ inputs.php-version }}-${{ hashFiles('**/composer.lock') }}
+        key: ${{ runner.os }}-composer-${{ steps.resolve-php.outputs.version }}-${{ hashFiles('**/composer.lock') }}
         restore-keys: |
-          ${{ runner.os }}-composer-${{ inputs.php-version }}
+          ${{ runner.os }}-composer-${{ steps.resolve-php.outputs.version }}
           ${{ runner.os }}-composer
 
     # setup apache etc
@@ -263,7 +284,7 @@ runs:
       shell: bash
       run: ${{ github.action_path }}/scripts/bash/prepare.sh
       env:
-        PHP_VERSION: ${{ inputs.php-version }}
+        PHP_VERSION: ${{ steps.resolve-php.outputs.version }}
         TEST_SUITE: ${{ inputs.test-type }}
         MATOMO_TEST_TARGET: ${{ inputs.matomo-test-branch }}
         MYSQL_ADAPTER: ${{ inputs.mysql-driver }}
@@ -289,7 +310,7 @@ runs:
       run: ${{ github.workspace }}/${{ inputs.setup-script }}
       working-directory: ${{ github.workspace }}/matomo
       env:
-        PHP_VERSION: ${{ inputs.php-version }}
+        PHP_VERSION: ${{ steps.resolve-php.outputs.version }}
         TEST_SUITE: ${{ inputs.test-type }}
         MATOMO_TEST_TARGET: ${{ inputs.matomo-test-branch }}
         PLUGIN_NAME: ${{ inputs.plugin-name }}
@@ -318,7 +339,7 @@ runs:
         TESTOMATIO: ${{ inputs.testomatio }}
         TESTOMATIO_CREATE: 1
         TESTOMATIO_FORCE_REPORT: ${{ inputs.testomatio-force-report }}
-        TESTOMATIO_ENV: PHP-${{ inputs.php-version }}, ${{ inputs.mysql-driver }}, ${{ inputs.mysql-engine }}
+        TESTOMATIO_ENV: PHP-${{ steps.resolve-php.outputs.version }}, ${{ inputs.mysql-driver }}, ${{ inputs.mysql-engine }}
         TRAVIS: '1'
 
     - name: Debug informations
