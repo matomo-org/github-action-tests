@@ -5,7 +5,7 @@ This action is able to run certain test suites for Matomo or any Matomo plugin.
 ### Inputs
 
   * **test-type**
-    
+
     Specifies the test types to run. This can be any of the following:
 
     - UI
@@ -31,7 +31,7 @@ This action is able to run certain test suites for Matomo or any Matomo plugin.
     It can either be a specific branch or tag name (like `4.x-dev` or `4.13.1`) or one of this magic keywords:
 
     - **minimum_required_matomo**
-    
+
       This will automatically try to determine the minimum required Matomo version for your plugin. This is done by looking at the version requirement in `plugin.json`
 
       If a version is defined in `plugin.json` this version will be tried to check out. If e.g. `>=4.0.0-b1,<5.0.0-b1` is defined it will try to check out `4.0.0-b1`.
@@ -39,7 +39,7 @@ This action is able to run certain test suites for Matomo or any Matomo plugin.
       In case the defined version can not be found. e.g. the tag `4.0.0-b1` is not available, it will first try to check out the stable version (if beta provided). e.g. `4.0.0` in this example. If that would also fail it falls back to the development branch of that major version. So `4.x-dev` in that case.
 
     - **maximum_supported_matomo**
-    
+
       This will automatically try to identify the maximum supported Matomo version for your plugin. This is also done by looking at the version requirement in `plugin.json`
 
       If a specific version is defined in `plugin.json` this version will be tried to check out. If e.g. `>=4.0.0-b1,<4.7.0` is defined it will try to check out `4.7.0` if a newer version has already been released. If no newer version is available it falls back using the development branch like below.
@@ -52,14 +52,16 @@ This action is able to run certain test suites for Matomo or any Matomo plugin.
   * **php-version**
 
     Defines the PHP version to set up for testing. (Not needed for Client tests)
-    
+
+    Use `matomo5_min_php` or `matomo5_max_php` to resolve to the centrally managed (defined in action.yml) minimum or maximum PHP versions supported by Matomo tests.
+
     The action uses `shivammathur/setup-php` to set up PHP. You can find supported PHP versions here: https://github.com/shivammathur/setup-php#tada-php-support
 
 
   * **node-version**
 
     Defines the Node version to set up for testing. (Not needed for PHP tests)
-    
+
 
   * **redis-service**
 
@@ -79,7 +81,7 @@ This action is able to run certain test suites for Matomo or any Matomo plugin.
   * **upload-artifacts**
 
     If set to true produced artifacts will be uploaded to https://build-artifacts.matomo.org
-    
+
     This is only relevant for test types: UI, PluginTests, SystemTestsPlugins and SystemTestsCore
 
 
@@ -89,7 +91,7 @@ This action is able to run certain test suites for Matomo or any Matomo plugin.
 
 
   * **artifacts-pass**
-    
+
     If artifacts should be uploaded to https://build-artifacts.matomo.org this option needs to contain the correct upload password.
 
 
