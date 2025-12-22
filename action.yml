@@ -228,7 +228,10 @@ runs:
           zend.exception_ignore_args=Off,
           mysqli.allow_local_infile=On,
           opcache.enable=0,
-          fatal_error_backtraces=Off
+          fatal_error_backtraces=Off,
+          opcache.enable_cli=0,
+          opcache.jit=0,
+          opcache.jit_buffer_size=0
         tools: composer:v2
         coverage: none
 
