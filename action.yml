@@ -227,9 +227,11 @@ runs:
           allow_url_fopen=on,
           zend.exception_ignore_args=Off,
           mysqli.allow_local_infile=On,
-          opcache.enable=0,
+          opcache.enable=1,
           fatal_error_backtraces=Off,
-          opcache.enable_cli=0,
+          opcache.enable_cli=1,
+          opcache.max_accelerated_files= 130987,
+          opcache.interned_strings_buffer=64,
           opcache.jit=0,
           opcache.jit_buffer_size=0
         tools: composer:v2
