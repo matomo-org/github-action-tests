@@ -78,6 +78,15 @@ if [ -n "$TEST_SUITE" ]; then
     echo "PHP VERSION DEBUG"
     echo "PHP VERSION IS: $(php -r "echo PHP_VERSION;")"
     echo "========================================"
+    echo "PHP VERSIONS INSTALLED:"
+    if [ -d /etc/php ]; then
+      ls -1 /etc/php
+    else
+      echo "/etc/php not found"
+    fi
+    echo "=-=-=-=-=-= phpunit -=-=-=-=-=-"
+    head -n 10 ./vendor/phpunit/phpunit/phpunit
+    echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-"
 
     if [ -n "$PLUGIN_NAME" ]; then
       if [ -d "plugins/$PLUGIN_NAME/Test" ]; then
