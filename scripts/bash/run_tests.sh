@@ -84,20 +84,36 @@ if [ -n "$TEST_SUITE" ]; then
     else
       echo "/etc/php not found"
     fi
+    if [ -f ./vendor/phpunit/phpunit/phpunit ]; then
+      if ! grep -q "PHP version within PHPUNIT" ./vendor/phpunit/phpunit/phpunit; then
+        phpunit_tmp="$(mktemp)"
+        awk '
+          BEGIN { inserted = 0 }
+          { print }
+          /declare\(strict_types=1\);/ && inserted == 0 {
+            print "";
+            print "echo \"************** PHP version within PHPUNIT *************\\n\";";
+            print "echo \"PHP VERSION IS: \" . PHP_VERSION . \"\\n\";";
+            print "echo \"********************************************************\\n\";";
+            inserted = 1
+          }
+        ' ./vendor/phpunit/phpunit/phpunit > "$phpunit_tmp" && mv "$phpunit_tmp" ./vendor/phpunit/phpunit/phpunit
+      fi
+    fi
     echo "=-=-=-=-=-= phpunit -=-=-=-=-=-"
     head -n 10 ./vendor/phpunit/phpunit/phpunit
     echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-"
 
     if [ -n "$PLUGIN_NAME" ]; then
       if [ -d "plugins/$PLUGIN_NAME/Test" ]; then
-        ./vendor/phpunit/phpunit/phpunit --configuration ./tests/PHPUnit/phpunit.xml --colors --testsuite $TEST_SUITE $PHPUNIT_EXTRA_OPTIONS plugins/$PLUGIN_NAME/Test/ | tee phpunit.out
+        php ./vendor/phpunit/phpunit/phpunit --configuration ./tests/PHPUnit/phpunit.xml --colors --testsuite $TEST_SUITE $PHPUNIT_EXTRA_OPTIONS plugins/$PLUGIN_NAME/Test/ | tee phpunit.out
       elif [ -d "plugins/$PLUGIN_NAME/tests" ]; then
-        ./vendor/phpunit/phpunit/phpunit --configuration ./tests/PHPUnit/phpunit.xml --colors --testsuite $TEST_SUITE $PHPUNIT_EXTRA_OPTIONS plugins/$PLUGIN_NAME/tests/ | tee phpunit.out
+        php ./vendor/phpunit/phpunit/phpunit --configuration ./tests/PHPUnit/phpunit.xml --colors --testsuite $TEST_SUITE $PHPUNIT_EXTRA_OPTIONS plugins/$PLUGIN_NAME/tests/ | tee phpunit.out
       else
-        ./vendor/phpunit/phpunit/phpunit --configuration ./tests/PHPUnit/phpunit.xml --colors --testsuite $TEST_SUITE --group $PLUGIN_NAME $PHPUNIT_EXTRA_OPTIONS | tee phpunit.out
+        php ./vendor/phpunit/phpunit/phpunit --configuration ./tests/PHPUnit/phpunit.xml --colors --testsuite $TEST_SUITE --group $PLUGIN_NAME $PHPUNIT_EXTRA_OPTIONS | tee phpunit.out
       fi
     else
-      ./vendor/phpunit/phpunit/phpunit --configuration ./tests/PHPUnit/phpunit.xml --testsuite $TEST_SUITE --colors $PHPUNIT_EXTRA_OPTIONS | tee phpunit.out
+      php ./vendor/phpunit/phpunit/phpunit --configuration ./tests/PHPUnit/phpunit.xml --testsuite $TEST_SUITE --colors $PHPUNIT_EXTRA_OPTIONS | tee phpunit.out
     fi
 
     exit_code="${PIPESTATUS[0]}"
