@@ -37,6 +37,10 @@ echo -e "${GREEN}composer install${SET}"
 composer config --no-plugins allow-plugins.dealerdirect/phpcodesniffer-composer-installer false
 composer install --ignore-platform-reqs
 
+echo "Instantiator.php output ++++++++++"
+cat /home/runner/work/matomo/matomo/matomo/vendor/doctrine/instantiator/src/Doctrine/Instantiator/Instantiator.php
+echo "++++++++++"
+
 # use PHPUnit 9.x for PHP 8.x
 if [[ "$PHP_VERSION" == "8."* ]]; then
   composer remove --dev phpunit/phpunit
