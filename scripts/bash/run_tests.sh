@@ -74,6 +74,11 @@ if [ -n "$TEST_SUITE" ]; then
       PHPUNIT_EXTRA_OPTIONS="$PHPUNIT_EXTRA_OPTIONS --log-junit results.xml"
     fi
 
+    echo "========================================"
+    echo "PHP VERSION DEBUG"
+    echo "PHP VERSION IS: $(php -r "echo PHP_VERSION;")"
+    echo "========================================"
+
     if [ -n "$PLUGIN_NAME" ]; then
       if [ -d "plugins/$PLUGIN_NAME/Test" ]; then
         ./vendor/phpunit/phpunit/phpunit --configuration ./tests/PHPUnit/phpunit.xml --colors --testsuite $TEST_SUITE $PHPUNIT_EXTRA_OPTIONS plugins/$PLUGIN_NAME/Test/ | tee phpunit.out
