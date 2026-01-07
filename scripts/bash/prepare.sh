@@ -40,7 +40,9 @@ composer install --ignore-platform-reqs
 # use PHPUnit 9.x for PHP 8.x
 if [[ "$PHP_VERSION" == "8."* ]]; then
   composer remove --dev phpunit/phpunit
-  composer require --dev phpunit/phpunit ~9.3 --ignore-platform-reqs
+  # made sure that phpunit version chooses 1.5.0 for doctrine/instantiator
+  # because the next version 2.0 introduces incompatible code to php 8.2
+  composer require --dev phpunit/phpunit ~9.3 doctrine/instantiator:^1.5.0 --ignore-platform-reqs
 fi
 
 # setup config
