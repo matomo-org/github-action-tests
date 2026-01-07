@@ -95,6 +95,14 @@ if [ -n "$TEST_SUITE" ]; then
             print "echo \"************** PHP version within PHPUNIT *************\\n\";";
             print "echo \"PHP VERSION IS: \" . PHP_VERSION . \"\\n\";";
             print "echo \"********************************************************\\n\";";
+            print "echo \"Instantiator.php output ++++++++++\\n\";";
+            print "$instantiatorPath = \"/home/runner/work/matomo/matomo/matomo/vendor/doctrine/instantiator/src/Doctrine/Instantiator/Instantiator.php\";";
+            print "if (is_file($instantiatorPath)) {";
+            print "    echo file_get_contents($instantiatorPath);";
+            print "} else {";
+            print "    echo \"File not found: \" . $instantiatorPath . \"\\n\";";
+            print "}";
+            print "echo \"\\n++++++++++\\n\";";
             inserted = 1
           }
         ' ./vendor/phpunit/phpunit/phpunit > "$phpunit_tmp" && mv "$phpunit_tmp" ./vendor/phpunit/phpunit/phpunit
