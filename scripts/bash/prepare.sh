@@ -44,7 +44,7 @@ echo "++++++++++"
 # use PHPUnit 9.x for PHP 8.x
 if [[ "$PHP_VERSION" == "8."* ]]; then
   composer remove --dev phpunit/phpunit
-  composer require --dev phpunit/phpunit ~9.3
+  composer require --dev phpunit/phpunit ~9.3 --ignore-platform-reqs
 fi
 
 # setup config
