@@ -84,6 +84,9 @@ if [ -n "$TEST_SUITE" ]; then
     else
       echo "/etc/php not found"
     fi
+    echo "======= doctrine/instantiator version ======="
+    composer show doctrine/instantiator --no-ansi --no-interaction || echo "composer show failed"
+    echo "============================================="
     if [ -f ./vendor/phpunit/phpunit/phpunit ]; then
       if ! grep -q "PHP version within PHPUNIT" ./vendor/phpunit/phpunit/phpunit; then
         phpunit_tmp="$(mktemp)"
