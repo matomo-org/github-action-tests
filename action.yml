@@ -96,7 +96,7 @@ inputs:
     required: false
     default: ''
   testomatio-force-report:
-    description: "Flag for whether to force uploading a report to Testomat.io instead of just push events. Only applies if the 'testomatio' token is set."
+    description: "Flag for whether to force uploading a report to Testomat.io instead of default event gating. Only applies if the 'testomatio' token is set."
     required: false
     default: false
 
@@ -332,7 +332,7 @@ runs:
         UITEST_EXTRA_OPTIONS: ${{ inputs.ui-test-options }}
         PHPUNIT_EXTRA_OPTIONS: ${{ inputs.phpunit-test-options }}
         GITHUB_BRANCH: ${{ github.head_ref || github.ref_name }}
-        GITHUB_IS_TRIGGERED_BY_PUSH: ${{ github.event_name == 'push' && 'true' || 'false' }}
+        GITHUB_EVENT_NAME: ${{ github.event_name }}
         MYSQL_ADAPTER: ${{ inputs.mysql-driver }}
         MYSQL_ENGINE: ${{ inputs.mysql-engine }}
         MYSQL_VERSION: ${{ inputs.mysql-version }}

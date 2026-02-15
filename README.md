@@ -127,6 +127,16 @@ This action is able to run certain test suites for Matomo or any Matomo plugin.
     Additional options to provide for PHPUnit tests. This can be used to provide debugging options for PHPUnit.
 
 
+  * **testomatio**
+
+    Testomat.io API token. If set, reports can be uploaded when the workflow is triggered by `schedule`.
+
+
+  * **testomatio-force-report**
+
+    Forces uploading a report to Testomat.io regardless of event trigger. This only applies when `testomatio` is set.
+
+
 ### Example usage for a Plugin
 ```yaml
   PluginTests:

@@ -4,16 +4,16 @@ GREEN='\033[0;32m'
 SET='\033[0m'
 
 function should_report_to_testomatio {
-  if [ -v "$TESTOMATIO" ]; then
+  if [ -z "$TESTOMATIO" ]; then
     return 1 # Return false
   fi
   if [ "$TESTOMATIO_FORCE_REPORT" == "true" ]; then
     return 0 # Return true since the token is set and the test was marked as force
   fi
-  if [ "$GITHUB_IS_TRIGGERED_BY_PUSH" == "false" ]; then
+  if [ "$TEST_SUITE" == "UnitTests" ]; then
     return 1  # Return false
   fi
-  if [ "$TEST_SUITE" == "UnitTests" ]; then
+  if [ "$GITHUB_EVENT_NAME" != "schedule" ]; then
     return 1 # Return false
   fi
 
