@@ -104,18 +104,32 @@ runs:
   using: "composite"
   steps:
 
+    - name: Init action timing
+      shell: bash
+      run: echo "ACTION_START_TS=$(date +%s)" >> "$GITHUB_ENV"
+
     - name: start mysql services
       if: inputs.mysql-service == 'true' && inputs.mysql-engine == 'Mysql'
       shell: bash
       run: |
+        MYSQL_VERSION="${{ inputs.mysql-version || '5.7' }}"
+        MYSQL_TUNING_FILE="mysql57-fast.cnf"
+
+        if [[ "$MYSQL_VERSION" == 8* ]]; then
+          MYSQL_TUNING_FILE="mysql80-fast.cnf"
+        fi
+
+        echo "Starting MySQL image mysql:${MYSQL_VERSION} with tuning file ${MYSQL_TUNING_FILE}"
         docker run -d \
           --tmpfs /var/lib/mysql:rw \
           -v ${{ github.action_path }}/artifacts/my.cnf:/etc/mysql/conf.d/my_custom.cnf:ro \
+          -v ${{ github.action_path }}/artifacts/${MYSQL_TUNING_FILE}:/etc/mysql/conf.d/my_fast.cnf:ro \
           --name mysql \
           -p 3306:3306 \
           -e MYSQL_ALLOW_EMPTY_PASSWORD=yes \
           -e MYSQL_DATABASE=matomo_tests \
-          mysql:${{ inputs.mysql-version || '5.7' }}
+          mysql:${MYSQL_VERSION} \
+          --skip-log-bin
 
         for i in $(seq 1 30); do
           if mysqladmin ping -h127.0.0.1 -uroot --silent; then
@@ -123,26 +137,78 @@ runs:
           fi
           sleep 1
         done
+        if ! mysqladmin ping -h127.0.0.1 -uroot --silent; then
+          echo "MySQL service did not become ready in time"
+          exit 1
+        fi
 
         mysql -h127.0.0.1 -uroot -e "
           SET GLOBAL sql_mode = 'NO_ENGINE_SUBSTITUTION,STRICT_TRANS_TABLES';
           SET GLOBAL wait_timeout = 36000;
           SET GLOBAL max_allowed_packet = 134209536;
           SET GLOBAL local_infile = On;
+          SET GLOBAL innodb_flush_log_at_trx_commit = 2;
+          SET GLOBAL sync_binlog = 0;
+          SET GLOBAL log_output = 'TABLE';
+          SET GLOBAL slow_query_log = 'ON';
+          SET GLOBAL long_query_time = 0.05;
+          SET GLOBAL min_examined_row_limit = 0;
+        "
+
+        mysql -h127.0.0.1 -uroot -e "SELECT @@version AS version, @@version_comment AS variant;"
+        mysql -h127.0.0.1 -uroot -e "
+          SHOW VARIABLES WHERE Variable_name IN (
+            'character_set_server',
+            'character_set_connection',
+            'collation_server',
+            'collation_connection',
+            'performance_schema',
+            'innodb_doublewrite',
+            'innodb_flush_method',
+            'innodb_buffer_pool_size',
+            'tmp_table_size',
+            'max_heap_table_size',
+            'table_open_cache',
+            'thread_cache_size',
+            'skip_name_resolve',
+            'innodb_flush_log_at_trx_commit',
+            'sync_binlog'
+          );
+        "
+
+        mysql -h127.0.0.1 -uroot -e "
+          SHOW VARIABLES WHERE Variable_name IN (
+            'innodb_doublewrite_pages',
+            'innodb_redo_log_capacity',
+            'innodb_log_buffer_size',
+            'information_schema_stats_expiry',
+            'innodb_stats_on_metadata',
+            'innodb_log_writer_threads',
+            'table_open_cache_instances',
+            'table_definition_cache',
+            'innodb_buffer_pool_instances',
+            'innodb_buffer_pool_chunk_size',
+            'innodb_stats_persistent',
+            'innodb_stats_persistent_sample_pages'
+          );
         "
 
     - name: start mariadb services
       if: inputs.mysql-service == 'true' && inputs.mysql-engine == 'Mariadb'
       shell: bash
       run: |
+        MARIADB_VERSION="${{ inputs.mysql-version || 'latest' }}"
+
+        echo "Starting MariaDB image mariadb:${MARIADB_VERSION} with tuning file mariadb114-fast.cnf"
         docker run -d \
           --tmpfs /var/lib/mysql:rw \
           -v ${{ github.action_path }}/artifacts/my.cnf:/etc/mysql/conf.d/my_custom.cnf:ro \
+          -v ${{ github.action_path }}/artifacts/mariadb114-fast.cnf:/etc/mysql/conf.d/my_fast.cnf:ro \
           --name mariadb \
           -p 3306:3306 \
           -e MARIADB_ALLOW_EMPTY_ROOT_PASSWORD=1 \
           -e MARIADB_DATABASE=matomo_tests \
-          mariadb:${{ inputs.mysql-version || 'latest' }}
+          mariadb:${MARIADB_VERSION}
 
         for i in $(seq 1 30); do
           if mysqladmin ping -h127.0.0.1 -uroot --silent; then
@@ -150,12 +216,39 @@ runs:
           fi
           sleep 1
         done
+        if ! mysqladmin ping -h127.0.0.1 -uroot --silent; then
+          echo "MariaDB service did not become ready in time"
+          exit 1
+        fi
 
         mysql -h127.0.0.1 -uroot -e "
           SET GLOBAL sql_mode = 'NO_ENGINE_SUBSTITUTION,STRICT_TRANS_TABLES';
           SET GLOBAL wait_timeout = 36000;
           SET GLOBAL max_allowed_packet = 134209536;
           SET GLOBAL local_infile = On;
+          SET GLOBAL innodb_flush_log_at_trx_commit = 2;
+          SET GLOBAL sync_binlog = 0;
+          SET GLOBAL log_output = 'TABLE';
+          SET GLOBAL slow_query_log = 'ON';
+          SET GLOBAL long_query_time = 0.05;
+          SET GLOBAL min_examined_row_limit = 0;
+        "
+
+        mysql -h127.0.0.1 -uroot -e "SELECT @@version AS version, @@version_comment AS variant;"
+        mysql -h127.0.0.1 -uroot -e "
+          SHOW VARIABLES WHERE Variable_name IN (
+            'performance_schema',
+            'innodb_doublewrite',
+            'innodb_flush_method',
+            'innodb_buffer_pool_size',
+            'tmp_table_size',
+            'max_heap_table_size',
+            'table_open_cache',
+            'thread_cache_size',
+            'skip_name_resolve',
+            'innodb_flush_log_at_trx_commit',
+            'sync_binlog'
+          );
         "
 
     - name: start tidb services
@@ -172,14 +265,35 @@ runs:
           fi
           sleep 1
         done
+        if ! mysqladmin ping -h127.0.0.1 -uroot --silent; then
+          echo "TiDB service did not become ready in time"
+          exit 1
+        fi
 
+        apply_global() {
+          local statement="$1"
+          if ! mysql -h127.0.0.1 -uroot -e "${statement}"; then
+            echo "Skipping unsupported statement for TiDB: ${statement}"
+          fi
+        }
+
+        apply_global "SET GLOBAL sql_mode = 'NO_ENGINE_SUBSTITUTION,STRICT_TRANS_TABLES';"
+        apply_global "SET GLOBAL wait_timeout = 36000;"
+        apply_global "SET GLOBAL max_allowed_packet = 134209536;"
+        apply_global "SET GLOBAL local_infile = On;"
+        apply_global "SET GLOBAL innodb_flush_log_at_trx_commit = 2;"
+        apply_global "SET GLOBAL sync_binlog = 0;"
+        mysql -h127.0.0.1 -uroot -e "CREATE DATABASE matomo_tests;"
+
+        mysql -h127.0.0.1 -uroot -e "SELECT @@version AS version, @@version_comment AS variant;"
         mysql -h127.0.0.1 -uroot -e "
-          SET GLOBAL sql_mode = 'NO_ENGINE_SUBSTITUTION,STRICT_TRANS_TABLES';
-          SET GLOBAL wait_timeout = 36000;
-          SET GLOBAL max_allowed_packet = 134209536;
-          SET GLOBAL local_infile = On;
-          CREATE DATABASE matomo_tests;
-        "
+          SHOW VARIABLES WHERE Variable_name IN (
+            'max_allowed_packet',
+            'wait_timeout',
+            'sql_mode',
+            'tidb_enable_noop_functions'
+          );
+        " || true
 
     - name: start redis services
       if: inputs.redis-service == 'true'
@@ -282,7 +396,14 @@ runs:
     # setup apache etc
     - name: prepare setup
       shell: bash
-      run: ${{ github.action_path }}/scripts/bash/prepare.sh
+      run: |
+        PREPARE_START_TS=$(date +%s)
+        set +e
+        ${{ github.action_path }}/scripts/bash/prepare.sh
+        PREPARE_EXIT_CODE=$?
+        set -e
+        echo "TIMER:prepare_setup:$(( $(date +%s) - PREPARE_START_TS ))s"
+        exit $PREPARE_EXIT_CODE
       env:
         PHP_VERSION: ${{ steps.resolve-php.outputs.version }}
         TEST_SUITE: ${{ inputs.test-type }}
@@ -322,10 +443,38 @@ runs:
       run: sudo apt-get install ripgrep
       working-directory: ${{ github.workspace }}/matomo
 
+    - name: Reset MySQL digest profile counters
+      if: inputs.mysql-service == 'true' && inputs.mysql-engine == 'Mysql'
+      working-directory: ${{ github.workspace }}/matomo
+      shell: bash
+      run: |
+        mysql -h127.0.0.1 -uroot -e "TRUNCATE TABLE performance_schema.events_statements_summary_by_digest;"
+        apply_global() {
+          local statement="$1"
+          if ! mysql -h127.0.0.1 -uroot -e "${statement}"; then
+            echo "Skipping unsupported MySQL optimization statement: ${statement}"
+          fi
+        }
+        apply_global "SET GLOBAL foreign_key_checks = 0;"
+        apply_global "SET GLOBAL unique_checks = 0;"
+        apply_global "SET GLOBAL innodb_stats_on_metadata = OFF;"
+
+    - name: Emit run parity info
+      shell: bash
+      run: |
+        echo "RUN_PARITY:test_suite=${{ inputs.test-type }},mysql_engine=${{ inputs.mysql-engine }},mysql_version=${{ inputs.mysql-version || 'default' }},plugin=${{ inputs.plugin-name || 'core' }}"
+
     - name: Run tests
       working-directory: ${{ github.workspace }}/matomo
       shell: bash
-      run: ${{ github.action_path }}/scripts/bash/run_tests.sh
+      run: |
+        TEST_START_TS=$(date +%s)
+        set +e
+        ${{ github.action_path }}/scripts/bash/run_tests.sh
+        TEST_EXIT_CODE=$?
+        set -e
+        echo "TIMER:test_execution:$(( $(date +%s) - TEST_START_TS ))s"
+        exit $TEST_EXIT_CODE
       env:
         TEST_SUITE: ${{ inputs.test-type }}
         PLUGIN_NAME: ${{ inputs.plugin-name }}
@@ -341,6 +490,38 @@ runs:
         TESTOMATIO_FORCE_REPORT: ${{ inputs.testomatio-force-report }}
         TESTOMATIO_ENV: PHP-${{ steps.resolve-php.outputs.version }}, ${{ inputs.mysql-driver }}, ${{ inputs.mysql-engine }}
         TRAVIS: '1'
+
+    - name: MySQL digest profile report
+      if: always() && inputs.mysql-service == 'true' && inputs.mysql-engine == 'Mysql'
+      working-directory: ${{ github.workspace }}/matomo
+      shell: bash
+      run: ${{ github.action_path }}/scripts/bash/report_mysql_digest_profile.sh
+      env:
+        MYSQL_ENGINE: ${{ inputs.mysql-engine }}
+        WORKSPACE: ${{ github.workspace }}/matomo
+
+    - name: Restore MySQL default checks
+      if: always() && inputs.mysql-service == 'true' && inputs.mysql-engine == 'Mysql'
+      shell: bash
+      run: |
+        mysql -h127.0.0.1 -uroot -e "SET GLOBAL foreign_key_checks = 1;" || true
+        mysql -h127.0.0.1 -uroot -e "SET GLOBAL unique_checks = 1;" || true
+
+    - name: Slow query report
+      if: always() && inputs.mysql-service == 'true' && inputs.mysql-engine == 'Mariadb'
+      working-directory: ${{ github.workspace }}/matomo
+      shell: bash
+      run: ${{ github.action_path }}/scripts/bash/report_slow_queries.sh
+      env:
+        MYSQL_ENGINE: ${{ inputs.mysql-engine }}
+
+    - name: Total action timing
+      if: always()
+      shell: bash
+      run: |
+        if [ -n "${ACTION_START_TS}" ]; then
+          echo "TIMER:total_action:$(( $(date +%s) - ACTION_START_TS ))s"
+        fi
 
     - name: Debug informations
       if: always()

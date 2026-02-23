@@ -1,0 +1,11 @@
+[mysqld]
+
+performance_schema = OFF
+innodb_doublewrite = 0
+innodb_flush_method = O_DIRECT
+innodb_buffer_pool_size = 1G
+tmp_table_size = 256M
+max_heap_table_size = 256M
+table_open_cache = 4000
+thread_cache_size = 64
+skip_name_resolve = ON

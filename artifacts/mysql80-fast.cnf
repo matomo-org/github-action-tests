@@ -1,0 +1,54 @@
+[mysqld]
+
+# Character set configuration
+character_set_server = latin1
+collation_server = latin1_swedish_ci
+character-set-client-handshake = FALSE
+
+# Performance schema
+performance_schema = ON
+
+# InnoDB doublewrite
+innodb_doublewrite = 0
+innodb_doublewrite_pages = 128
+
+# InnoDB flush method
+innodb_flush_method = O_DIRECT_NO_FSYNC
+
+# InnoDB redo log optimization
+innodb_redo_log_capacity = 2G
+innodb_log_buffer_size = 64M
+innodb_log_writer_threads = OFF
+
+# InnoDB undo log
+innodb_undo_log_truncate = OFF
+innodb_rollback_segments = 1
+
+# Transaction isolation (reduces MVCC read-view lifetime → faster undo purge)
+transaction_isolation = READ-COMMITTED
+
+# InnoDB buffer pool
+innodb_buffer_pool_size = 1G
+innodb_buffer_pool_instances = 1
+innodb_buffer_pool_chunk_size = 134217728
+
+# InnoDB statistics
+innodb_stats_on_metadata = OFF
+innodb_stats_persistent = ON
+innodb_stats_persistent_sample_pages = 4
+
+# INFORMATION_SCHEMA optimization
+information_schema_stats_expiry = 0
+
+# Table caching
+tmp_table_size = 256M
+max_heap_table_size = 256M
+table_open_cache = 4000
+table_open_cache_instances = 1
+table_definition_cache = 2000
+thread_cache_size = 64
+
+# Networking
+skip_name_resolve = ON
+skip_ssl = ON
+auto_generate_certs = OFF

@@ -70,7 +70,28 @@ This action is able to run certain test suites for Matomo or any Matomo plugin.
 
   * **mysql-service**
 
-    Defines if a MySQL server should be set up before testing. If so a MySQL 5.7 server using tmpfs will be set up.
+    Defines if a database server should be set up before testing.
+
+    CI startup uses aggressive performance tuning by default for MySQL (5.7 / 8.0), MariaDB (11.4 compatible), and TiDB (compatible subset only).
+    MySQL 8.0 is configured for maximum CI speed using 5.7-like `latin1_swedish_ci` collation defaults.
+    For MySQL (5.7 and 8.0), CI prints a top 100 `performance_schema` digest profile at the end of the run sorted by total time spent descending.
+    The MySQL digest report also prints statement class totals and top DDL statements by time and count.
+    For MariaDB, CI enables slow query logging with `long_query_time=0.05` and prints a top 100 summary at the end of the run sorted by total time spent descending.
+
+
+  * **mysql-engine**
+
+    Defines which database engine should be used. Can be `Mysql` (default), `Mariadb`, or `Tidb`.
+
+
+  * **mysql-version**
+
+    Defines which database version tag to use.
+
+    Defaults:
+    - `Mysql`: `5.7`
+    - `Mariadb`: `latest`
+    - `Tidb`: `latest`
 
 
   * **mysql-driver**
