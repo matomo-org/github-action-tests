@@ -318,6 +318,140 @@ foreach ($directories as $directory) {
 PHP
 }
 
+function write_sharded_phpunit_config {
+  local suite_name="$1"
+  local selected_directories_file="$2"
+  local output_config_file="$3"
+
+  TARGET_TEST_SUITE="$suite_name" SELECTED_DIRECTORIES_FILE="$selected_directories_file" OUTPUT_CONFIG_FILE="$output_config_file" php <<'PHP'
+<?php
+$suiteName = getenv('TARGET_TEST_SUITE');
+$selectedDirectoriesFile = getenv('SELECTED_DIRECTORIES_FILE');
+$outputConfigFile = getenv('OUTPUT_CONFIG_FILE');
+$configPath = getcwd() . '/tests/PHPUnit/phpunit.xml';
+
+if (!$suiteName || !$selectedDirectoriesFile || !$outputConfigFile) {
+    fwrite(STDERR, "Missing sharded phpunit config inputs.\n");
+    exit(1);
+}
+
+if (!file_exists($configPath)) {
+    fwrite(STDERR, "Unable to find phpunit config at {$configPath}.\n");
+    exit(1);
+}
+
+$selectedDirectories = [];
+foreach (file($selectedDirectoriesFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
+    $line = trim($line);
+    if ($line !== '') {
+        $selectedDirectories[$line] = true;
+    }
+}
+
+if (count($selectedDirectories) === 0) {
+    fwrite(STDERR, "No selected directories provided for sharded phpunit config.\n");
+    exit(1);
+}
+
+$dom = new DOMDocument();
+$dom->preserveWhiteSpace = false;
+$dom->formatOutput = true;
+
+if (!@$dom->load($configPath)) {
+    fwrite(STDERR, "Unable to parse phpunit config at {$configPath}.\n");
+    exit(1);
+}
+
+$suiteNodes = [];
+foreach ($dom->getElementsByTagName('testsuite') as $testsuiteNode) {
+    if ($testsuiteNode->getAttribute('name') === $suiteName) {
+        $suiteNodes[] = $testsuiteNode;
+    }
+}
+
+if (count($suiteNodes) === 0) {
+    fwrite(STDERR, "Unable to find testsuite '{$suiteName}' in {$configPath}.\n");
+    exit(1);
+}
+
+$configDir = dirname(realpath($configPath));
+
+function expandPatternToDirectoriesForShard($configDir, $rawPath)
+{
+    $absolutePattern = strlen($rawPath) > 0 && $rawPath[0] === '/'
+        ? $rawPath
+        : $configDir . '/' . $rawPath;
+
+    $matches = glob($absolutePattern, GLOB_BRACE);
+    if ($matches === false || count($matches) === 0) {
+        $resolvedPath = realpath($absolutePattern);
+        return ($resolvedPath && is_dir($resolvedPath)) ? [$resolvedPath] : [];
+    }
+
+    $resolvedMatches = [];
+    foreach ($matches as $match) {
+        $resolvedMatch = realpath($match);
+        if ($resolvedMatch && is_dir($resolvedMatch)) {
+            $resolvedMatches[] = $resolvedMatch;
+        }
+    }
+
+    return $resolvedMatches;
+}
+
+foreach ($suiteNodes as $suiteNode) {
+    $selectedDirectoryNodes = [];
+
+    foreach ($suiteNode->childNodes as $childNode) {
+        if (!$childNode instanceof DOMElement || $childNode->nodeName !== 'directory') {
+            continue;
+        }
+
+        $rawPath = trim($childNode->textContent);
+        if ($rawPath === '') {
+            continue;
+        }
+
+        foreach (expandPatternToDirectoriesForShard($configDir, $rawPath) as $resolvedDir) {
+            if (!isset($selectedDirectories[$resolvedDir])) {
+                continue;
+            }
+
+            $attributes = [];
+            foreach ($childNode->attributes as $attribute) {
+                $attributes[] = [
+                    'name' => $attribute->name,
+                    'value' => $attribute->value,
+                ];
+            }
+
+            $selectedDirectoryNodes[] = [
+                'path' => $resolvedDir,
+                'attributes' => $attributes,
+            ];
+        }
+    }
+
+    while ($suiteNode->firstChild) {
+        $suiteNode->removeChild($suiteNode->firstChild);
+    }
+
+    foreach ($selectedDirectoryNodes as $selectedDirectoryNode) {
+        $directoryNode = $dom->createElement('directory', $selectedDirectoryNode['path']);
+        foreach ($selectedDirectoryNode['attributes'] as $attribute) {
+            $directoryNode->setAttribute($attribute['name'], $attribute['value']);
+        }
+        $suiteNode->appendChild($directoryNode);
+    }
+}
+
+if ($dom->save($outputConfigFile) === false) {
+    fwrite(STDERR, "Unable to write sharded phpunit config to {$outputConfigFile}.\n");
+    exit(1);
+}
+PHP
+}
+
 function select_shard_files {
   local total="$1"
   local index="$2"
@@ -420,6 +554,7 @@ if [ -n "$TEST_SUITE" ]; then
     shard_files=()
     shard_directories=()
     shard_by_directories=false
+    sharded_phpunit_config=''
 
     if validate_phpunit_shards && is_phpunit_suite "$TEST_SUITE"; then
       echo -e "${GREEN}Sharding PHPUnit suite $TEST_SUITE: shard ${PHPUNIT_TEST_SHARD_INDEX}/${PHPUNIT_TEST_SHARDS_TOTAL}${SET}"
@@ -448,6 +583,11 @@ if [ -n "$TEST_SUITE" ]; then
         fi
 
         echo -e "${GREEN}Selected ${#shard_directories[@]} of ${#all_shard_directories[@]} plugin integration directories for this shard.${SET}"
+        selected_directories_file="$(mktemp)"
+        sharded_phpunit_config="$(mktemp --suffix=.xml)"
+        printf '%s\n' "${shard_directories[@]}" > "$selected_directories_file"
+        write_sharded_phpunit_config "$TEST_SUITE" "$selected_directories_file" "$sharded_phpunit_config"
+        phpunit_base_command=(./vendor/phpunit/phpunit/phpunit --configuration "$sharded_phpunit_config" --colors)
       elif [ -n "$PLUGIN_NAME" ]; then
         if [ -d "plugins/$PLUGIN_NAME/Test" ]; then
           while IFS= read -r -d '' file; do
@@ -506,9 +646,7 @@ if [ -n "$TEST_SUITE" ]; then
       fi
     else
       phpunit_command=("${phpunit_base_command[@]}" --testsuite "$TEST_SUITE" "${phpunit_extra_args[@]}")
-      if [ "${#shard_directories[@]}" -gt 0 ]; then
-        phpunit_command+=("${shard_directories[@]}")
-      elif [ "${#shard_files[@]}" -gt 0 ]; then
+      if [ "${#shard_files[@]}" -gt 0 ]; then
         phpunit_command+=("${shard_files[@]}")
       fi
     fi
