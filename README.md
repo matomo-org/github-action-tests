@@ -128,14 +128,14 @@ This action is able to run certain test suites for Matomo or any Matomo plugin.
 
   * **phpunit-test-shards-total**
 
-    Optional total shard count for PHPUnit-backed test suites. When this and `phpunit-test-shard-index` are both provided, the action will shard the requested PHPUnit suite. `IntegrationTestsPlugins` is sharded by plugin integration directories to keep each plugin's suite intact.
+    Optional total shard count for PHPUnit-backed test suites. When this and `phpunit-test-shard-index` are both provided, the action will discover the selected suite with PHPUnit's `--list-tests` output, split the discovered tests deterministically, and run only the selected shard with `--filter`.
 
   * **phpunit-test-shard-index**
 
     Optional zero-based shard index for PHPUnit-backed test suites. Must be provided together with `phpunit-test-shards-total`.
 
 
-### Example usage for sharded core PHPUnit tests
+### Example usage for sharded PHPUnit tests
 ```yaml
   PHP:
     runs-on: ubuntu-24.04
@@ -197,7 +197,7 @@ This action is able to run certain test suites for Matomo or any Matomo plugin.
           phpunit-test-shard-index: ${{ matrix.parts }}
 ```
 
-This keeps the workflow close to the existing PHP matrix while only fanning out `IntegrationTestsPlugins`. Sharding for that suite is done by plugin integration directories, so runtime may still be uneven if some plugins are much heavier than others.
+This keeps the workflow close to the existing PHP matrix while only fanning out `IntegrationTestsPlugins`. Sharding is based on PHPUnit discovery output and a deterministic modulo split, so runtime may still be uneven if some tests are much heavier than others.
 
 
 ### Example usage for a Plugin
