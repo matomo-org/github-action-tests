@@ -40,6 +40,14 @@ inputs:
   phpunit-test-options:
     description: "Additional options to run PHPUnit with"
     required: false
+  phpunit-test-shards-total:
+    description: "Total number of shards to split PHPUnit-backed test suites into"
+    required: false
+    default: ''
+  phpunit-test-shard-index:
+    description: "Zero-based shard index to run for PHPUnit-backed test suites"
+    required: false
+    default: ''
   php-version:
     description: 'PHP version to set up for testing. Can be any version supported by shivammathur/setup-php'
     required: true
@@ -331,6 +339,8 @@ runs:
         PLUGIN_NAME: ${{ inputs.plugin-name }}
         UITEST_EXTRA_OPTIONS: ${{ inputs.ui-test-options }}
         PHPUNIT_EXTRA_OPTIONS: ${{ inputs.phpunit-test-options }}
+        PHPUNIT_TEST_SHARDS_TOTAL: ${{ inputs.phpunit-test-shards-total }}
+        PHPUNIT_TEST_SHARD_INDEX: ${{ inputs.phpunit-test-shard-index }}
         GITHUB_BRANCH: ${{ github.head_ref || github.ref_name }}
         GITHUB_IS_TRIGGERED_BY_PUSH: ${{ github.event_name == 'push' && 'true' || 'false' }}
         MYSQL_ADAPTER: ${{ inputs.mysql-driver }}

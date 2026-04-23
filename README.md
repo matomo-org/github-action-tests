@@ -126,6 +126,79 @@ This action is able to run certain test suites for Matomo or any Matomo plugin.
 
     Additional options to provide for PHPUnit tests. This can be used to provide debugging options for PHPUnit.
 
+  * **phpunit-test-shards-total**
+
+    Optional total shard count for PHPUnit-backed test suites. When this and `phpunit-test-shard-index` are both provided, the action will enumerate test files for the requested suite, sort them, and run the subset matching `index % total == shard`.
+
+  * **phpunit-test-shard-index**
+
+    Optional zero-based shard index for PHPUnit-backed test suites. Must be provided together with `phpunit-test-shards-total`.
+
+
+### Example usage for sharded core PHPUnit tests
+```yaml
+  PHP:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        type: [ 'UnitTests', 'SystemTestsPlugins', 'SystemTestsCore', 'IntegrationTestsCore', 'IntegrationTestsPlugins' ]
+        environment:
+          - php: '7.2'
+            adapter: 'PDO_MYSQL'
+            mysql-engine: 'Mysql'
+            mysql-version: '5.7'
+          - php: '8.2'
+            adapter: 'PDO_MYSQL'
+            mysql-engine: 'Mariadb'
+            mysql-version: '11.4'
+        parts: [0, 1, 2, 3]
+        exclude:
+          - type: 'UnitTests'
+            parts: 1
+          - type: 'UnitTests'
+            parts: 2
+          - type: 'UnitTests'
+            parts: 3
+          - type: 'SystemTestsPlugins'
+            parts: 1
+          - type: 'SystemTestsPlugins'
+            parts: 2
+          - type: 'SystemTestsPlugins'
+            parts: 3
+          - type: 'SystemTestsCore'
+            parts: 1
+          - type: 'SystemTestsCore'
+            parts: 2
+          - type: 'SystemTestsCore'
+            parts: 3
+          - type: 'IntegrationTestsCore'
+            parts: 1
+          - type: 'IntegrationTestsCore'
+            parts: 2
+          - type: 'IntegrationTestsCore'
+            parts: 3
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          lfs: false
+          persist-credentials: false
+          submodules: true
+          path: matomo
+      - name: Run tests
+        uses: matomo-org/github-action-tests@main
+        with:
+          test-type: ${{ matrix.type }}
+          mysql-driver: ${{ matrix.environment.adapter }}
+          mysql-engine: ${{ matrix.environment.mysql-engine }}
+          mysql-version: ${{ matrix.environment.mysql-version }}
+          php-version: ${{ matrix.environment.php }}
+          phpunit-test-shards-total: ${{ matrix.type == 'IntegrationTestsPlugins' && 4 || 1 }}
+          phpunit-test-shard-index: ${{ matrix.parts }}
+```
+
+This keeps the workflow close to the existing PHP matrix while only fanning out `IntegrationTestsPlugins`. File-based sharding is deterministic, but runtime may still be uneven if some test files are much heavier than others.
+
 
 ### Example usage for a Plugin
 ```yaml
