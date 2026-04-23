@@ -146,18 +146,19 @@ if [ -n "$TEST_SUITE" ]; then
 $tests = [];
 while (($line = fgets(STDIN)) !== false) {
     if (preg_match("/^\s*-\s+(.+)$/", $line, $matches)) {
-        $tests[] = $matches[1];
+        $tests[] = preg_split("/::/", $matches[1], 2)[0];
     }
 }
 
 sort($tests, SORT_STRING);
+$tests = array_values(array_unique($tests));
 $total = (int) $argv[1];
 $index = (int) $argv[2];
 
 $selected = [];
 foreach ($tests as $position => $testName) {
     if ($position % $total === $index) {
-        $selected[] = preg_quote($testName, "/");
+        $selected[] = preg_quote($testName, "/") . "::";
     }
 }
 
