@@ -167,7 +167,7 @@ if (count($selected) === 0) {
     exit(1);
 }
 
-echo "^(?:" . implode("|", $selected) . ")$";
+echo "^(?:" . implode("|", $selected) . ")";
 ' "$PHPUNIT_TEST_SHARDS_TOTAL" "$PHPUNIT_TEST_SHARD_INDEX"
       )"
       phpunit_shard_filter_status=$?
