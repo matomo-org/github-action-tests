@@ -254,6 +254,17 @@ if (!@$dom->load($configPath)) {
     exit(1);
 }
 
+$bootstrapPath = realpath(getcwd() . '/tests/PHPUnit/bootstrap.php');
+if (!$bootstrapPath) {
+    fwrite(STDERR, "Unable to resolve phpunit bootstrap path.\n");
+    exit(1);
+}
+
+$phpunitRoot = $dom->getElementsByTagName('phpunit')->item(0);
+if ($phpunitRoot instanceof DOMElement) {
+    $phpunitRoot->setAttribute('bootstrap', $bootstrapPath);
+}
+
 $suiteNodes = [];
 foreach ($dom->getElementsByTagName('testsuite') as $testsuiteNode) {
     if ($testsuiteNode->getAttribute('name') === $suiteName) {
@@ -360,6 +371,17 @@ $dom->formatOutput = true;
 if (!@$dom->load($configPath)) {
     fwrite(STDERR, "Unable to parse phpunit config at {$configPath}.\n");
     exit(1);
+}
+
+$bootstrapPath = realpath(getcwd() . '/tests/PHPUnit/bootstrap.php');
+if (!$bootstrapPath) {
+    fwrite(STDERR, "Unable to resolve phpunit bootstrap path.\n");
+    exit(1);
+}
+
+$phpunitRoot = $dom->getElementsByTagName('phpunit')->item(0);
+if ($phpunitRoot instanceof DOMElement) {
+    $phpunitRoot->setAttribute('bootstrap', $bootstrapPath);
 }
 
 $suiteNodes = [];
