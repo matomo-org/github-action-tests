@@ -39,6 +39,10 @@ function validate_phpunit_shards {
     exit 1
   fi
 
+  if [ "$PHPUNIT_TEST_SHARDS_TOTAL" -le 1 ]; then
+    return 1
+  fi
+
   return 0
 }
 
@@ -81,7 +85,47 @@ if (count($suiteNodes) === 0) {
 $configDir = dirname(realpath($configPath));
 $paths = [];
 
+function expandPattern($configDir, $rawPath)
+{
+    $absolutePattern = strlen($rawPath) > 0 && $rawPath[0] === '/'
+        ? $rawPath
+        : $configDir . '/' . $rawPath;
+
+    $matches = glob($absolutePattern, GLOB_BRACE);
+    if ($matches === false || count($matches) === 0) {
+        $resolvedPath = realpath($absolutePattern);
+        return $resolvedPath ? [$resolvedPath] : [];
+    }
+
+    $resolvedMatches = [];
+    foreach ($matches as $match) {
+        $resolvedMatch = realpath($match);
+        if ($resolvedMatch) {
+            $resolvedMatches[] = $resolvedMatch;
+        }
+    }
+
+    return $resolvedMatches;
+}
+
 foreach ($suiteNodes as $suiteNode) {
+    $suiteLevelExcludes = [];
+
+    foreach ($suiteNode->childNodes as $childNode) {
+        if (!$childNode instanceof DOMElement || $childNode->nodeName !== 'exclude') {
+            continue;
+        }
+
+        $excludePath = trim($childNode->textContent);
+        if ($excludePath === '') {
+            continue;
+        }
+
+        foreach (expandPattern($configDir, $excludePath) as $resolvedExclude) {
+            $suiteLevelExcludes[] = rtrim($resolvedExclude, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
+        }
+    }
+
     foreach ($suiteNode->childNodes as $childNode) {
         if (!$childNode instanceof DOMElement) {
             continue;
@@ -93,14 +137,11 @@ foreach ($suiteNodes as $suiteNode) {
             continue;
         }
 
-        $absolutePath = $rawPath[0] === '/'
-            ? $rawPath
-            : $configDir . '/' . $rawPath;
-
         if ($nodeName === 'file') {
-            $resolvedFile = realpath($absolutePath);
-            if ($resolvedFile && is_file($resolvedFile)) {
-                $paths[$resolvedFile] = true;
+            foreach (expandPattern($configDir, $rawPath) as $resolvedFile) {
+                if (is_file($resolvedFile)) {
+                    $paths[$resolvedFile] = true;
+                }
             }
             continue;
         }
@@ -109,18 +150,13 @@ foreach ($suiteNodes as $suiteNode) {
             continue;
         }
 
-        $resolvedDir = realpath($absolutePath);
-        if (!$resolvedDir || !is_dir($resolvedDir)) {
-            continue;
-        }
-
         $suffix = $childNode->getAttribute('suffix');
         if ($suffix === '') {
             $suffix = 'Test.php';
         }
         $prefix = $childNode->getAttribute('prefix');
-        $exclude = [];
 
+        $directoryLevelExcludes = [];
         foreach ($childNode->childNodes as $directoryChild) {
             if (!$directoryChild instanceof DOMElement || $directoryChild->nodeName !== 'exclude') {
                 continue;
@@ -131,44 +167,51 @@ foreach ($suiteNodes as $suiteNode) {
                 continue;
             }
 
-            $resolvedExclude = realpath($excludePath[0] === '/' ? $excludePath : $resolvedDir . '/' . $excludePath);
-            if ($resolvedExclude) {
-                $exclude[] = rtrim($resolvedExclude, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
+            foreach (expandPattern($configDir, $excludePath) as $resolvedExclude) {
+                $directoryLevelExcludes[] = rtrim($resolvedExclude, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
             }
         }
 
-        $iterator = new RecursiveIteratorIterator(
-            new RecursiveDirectoryIterator($resolvedDir, FilesystemIterator::SKIP_DOTS)
-        );
+        $excludePaths = array_merge($suiteLevelExcludes, $directoryLevelExcludes);
 
-        foreach ($iterator as $fileInfo) {
-            if (!$fileInfo->isFile()) {
+        foreach (expandPattern($configDir, $rawPath) as $resolvedDir) {
+            if (!is_dir($resolvedDir)) {
                 continue;
             }
 
-            $filePath = $fileInfo->getPathname();
-            $normalizedFilePath = rtrim($filePath, DIRECTORY_SEPARATOR);
+            $iterator = new RecursiveIteratorIterator(
+                new RecursiveDirectoryIterator($resolvedDir, FilesystemIterator::SKIP_DOTS)
+            );
 
-            $isExcluded = false;
-            foreach ($exclude as $excludePath) {
-                if (strpos($normalizedFilePath . DIRECTORY_SEPARATOR, $excludePath) === 0) {
-                    $isExcluded = true;
-                    break;
+            foreach ($iterator as $fileInfo) {
+                if (!$fileInfo->isFile()) {
+                    continue;
                 }
-            }
-            if ($isExcluded) {
-                continue;
-            }
 
-            $filename = $fileInfo->getFilename();
-            if ($suffix !== '' && substr($filename, -strlen($suffix)) !== $suffix) {
-                continue;
-            }
-            if ($prefix !== '' && strpos($filename, $prefix) !== 0) {
-                continue;
-            }
+                $filePath = $fileInfo->getPathname();
+                $normalizedFilePath = rtrim($filePath, DIRECTORY_SEPARATOR);
 
-            $paths[$filePath] = true;
+                $isExcluded = false;
+                foreach ($excludePaths as $excludePath) {
+                    if (strpos($normalizedFilePath . DIRECTORY_SEPARATOR, $excludePath) === 0) {
+                        $isExcluded = true;
+                        break;
+                    }
+                }
+                if ($isExcluded) {
+                    continue;
+                }
+
+                $filename = $fileInfo->getFilename();
+                if ($suffix !== '' && substr($filename, -strlen($suffix)) !== $suffix) {
+                    continue;
+                }
+                if ($prefix !== '' && strpos($filename, $prefix) !== 0) {
+                    continue;
+                }
+
+                $paths[$filePath] = true;
+            }
         }
     }
 }
