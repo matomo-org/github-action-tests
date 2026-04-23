@@ -419,6 +419,7 @@ if [ -n "$TEST_SUITE" ]; then
     phpunit_command=()
     shard_files=()
     shard_directories=()
+    shard_by_directories=false
 
     if validate_phpunit_shards && is_phpunit_suite "$TEST_SUITE"; then
       echo -e "${GREEN}Sharding PHPUnit suite $TEST_SUITE: shard ${PHPUNIT_TEST_SHARD_INDEX}/${PHPUNIT_TEST_SHARDS_TOTAL}${SET}"
@@ -427,6 +428,7 @@ if [ -n "$TEST_SUITE" ]; then
       all_shard_directories=()
 
       if [ "$TEST_SUITE" = "IntegrationTestsPlugins" ] && [ -z "$PLUGIN_NAME" ]; then
+        shard_by_directories=true
         while IFS= read -r -d '' file; do
           all_shard_directories+=("$file")
         done < <(TARGET_TEST_SUITE="$TEST_SUITE" collect_phpunit_suite_directories)
@@ -465,21 +467,23 @@ if [ -n "$TEST_SUITE" ]; then
         done < <(TARGET_TEST_SUITE="$TEST_SUITE" collect_phpunit_suite_files)
       fi
 
-      if [ "${#all_shard_files[@]}" -eq 0 ]; then
-        echo "No PHPUnit test files found for suite $TEST_SUITE."
-        exit 1
+      if [ "$shard_by_directories" != "true" ]; then
+        if [ "${#all_shard_files[@]}" -eq 0 ]; then
+          echo "No PHPUnit test files found for suite $TEST_SUITE."
+          exit 1
+        fi
+
+        while IFS= read -r -d '' file; do
+          shard_files+=("$file")
+        done < <(select_shard_files "$PHPUNIT_TEST_SHARDS_TOTAL" "$PHPUNIT_TEST_SHARD_INDEX" "${all_shard_files[@]}")
+
+        if [ "${#shard_files[@]}" -eq 0 ]; then
+          echo "No PHPUnit test files selected for suite $TEST_SUITE shard ${PHPUNIT_TEST_SHARD_INDEX}/${PHPUNIT_TEST_SHARDS_TOTAL}."
+          exit 1
+        fi
+
+        echo -e "${GREEN}Selected ${#shard_files[@]} of ${#all_shard_files[@]} test files for this shard.${SET}"
       fi
-
-      while IFS= read -r -d '' file; do
-        shard_files+=("$file")
-      done < <(select_shard_files "$PHPUNIT_TEST_SHARDS_TOTAL" "$PHPUNIT_TEST_SHARD_INDEX" "${all_shard_files[@]}")
-
-      if [ "${#shard_files[@]}" -eq 0 ]; then
-        echo "No PHPUnit test files selected for suite $TEST_SUITE shard ${PHPUNIT_TEST_SHARD_INDEX}/${PHPUNIT_TEST_SHARDS_TOTAL}."
-        exit 1
-      fi
-
-      echo -e "${GREEN}Selected ${#shard_files[@]} of ${#all_shard_files[@]} test files for this shard.${SET}"
     fi
 
     if [ -n "$PLUGIN_NAME" ]; then
