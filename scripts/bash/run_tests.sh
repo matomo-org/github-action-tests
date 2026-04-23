@@ -230,6 +230,94 @@ function collect_plugin_test_files {
   find "$plugin_dir" -type f -name '*Test.php' -print0 | sort -z
 }
 
+function collect_phpunit_suite_directories {
+  php <<'PHP'
+<?php
+$suiteName = getenv('TARGET_TEST_SUITE');
+$configPath = getcwd() . '/tests/PHPUnit/phpunit.xml';
+
+if (!$suiteName) {
+    fwrite(STDERR, "TARGET_TEST_SUITE is not set.\n");
+    exit(1);
+}
+
+if (!file_exists($configPath)) {
+    fwrite(STDERR, "Unable to find phpunit config at {$configPath}.\n");
+    exit(1);
+}
+
+$dom = new DOMDocument();
+$dom->preserveWhiteSpace = false;
+
+if (!@$dom->load($configPath)) {
+    fwrite(STDERR, "Unable to parse phpunit config at {$configPath}.\n");
+    exit(1);
+}
+
+$suiteNodes = [];
+foreach ($dom->getElementsByTagName('testsuite') as $testsuiteNode) {
+    if ($testsuiteNode->getAttribute('name') === $suiteName) {
+        $suiteNodes[] = $testsuiteNode;
+    }
+}
+
+if (count($suiteNodes) === 0) {
+    fwrite(STDERR, "Unable to find testsuite '{$suiteName}' in {$configPath}.\n");
+    exit(1);
+}
+
+$configDir = dirname(realpath($configPath));
+$paths = [];
+
+function expandPatternToDirectories($configDir, $rawPath)
+{
+    $absolutePattern = strlen($rawPath) > 0 && $rawPath[0] === '/'
+        ? $rawPath
+        : $configDir . '/' . $rawPath;
+
+    $matches = glob($absolutePattern, GLOB_BRACE);
+    if ($matches === false || count($matches) === 0) {
+        $resolvedPath = realpath($absolutePattern);
+        return ($resolvedPath && is_dir($resolvedPath)) ? [$resolvedPath] : [];
+    }
+
+    $resolvedMatches = [];
+    foreach ($matches as $match) {
+        $resolvedMatch = realpath($match);
+        if ($resolvedMatch && is_dir($resolvedMatch)) {
+            $resolvedMatches[] = $resolvedMatch;
+        }
+    }
+
+    return $resolvedMatches;
+}
+
+foreach ($suiteNodes as $suiteNode) {
+    foreach ($suiteNode->childNodes as $childNode) {
+        if (!$childNode instanceof DOMElement || $childNode->nodeName !== 'directory') {
+            continue;
+        }
+
+        $rawPath = trim($childNode->textContent);
+        if ($rawPath === '') {
+            continue;
+        }
+
+        foreach (expandPatternToDirectories($configDir, $rawPath) as $resolvedDir) {
+            $paths[$resolvedDir] = true;
+        }
+    }
+}
+
+$directories = array_keys($paths);
+sort($directories, SORT_STRING);
+
+foreach ($directories as $directory) {
+    echo $directory, "\0";
+}
+PHP
+}
+
 function select_shard_files {
   local total="$1"
   local index="$2"
@@ -330,13 +418,35 @@ if [ -n "$TEST_SUITE" ]; then
     phpunit_base_command=(./vendor/phpunit/phpunit/phpunit --configuration ./tests/PHPUnit/phpunit.xml --colors)
     phpunit_command=()
     shard_files=()
+    shard_directories=()
 
     if validate_phpunit_shards && is_phpunit_suite "$TEST_SUITE"; then
       echo -e "${GREEN}Sharding PHPUnit suite $TEST_SUITE: shard ${PHPUNIT_TEST_SHARD_INDEX}/${PHPUNIT_TEST_SHARDS_TOTAL}${SET}"
 
       all_shard_files=()
+      all_shard_directories=()
 
-      if [ -n "$PLUGIN_NAME" ]; then
+      if [ "$TEST_SUITE" = "IntegrationTestsPlugins" ] && [ -z "$PLUGIN_NAME" ]; then
+        while IFS= read -r -d '' file; do
+          all_shard_directories+=("$file")
+        done < <(TARGET_TEST_SUITE="$TEST_SUITE" collect_phpunit_suite_directories)
+
+        if [ "${#all_shard_directories[@]}" -eq 0 ]; then
+          echo "No PHPUnit test directories found for suite $TEST_SUITE."
+          exit 1
+        fi
+
+        while IFS= read -r -d '' file; do
+          shard_directories+=("$file")
+        done < <(select_shard_files "$PHPUNIT_TEST_SHARDS_TOTAL" "$PHPUNIT_TEST_SHARD_INDEX" "${all_shard_directories[@]}")
+
+        if [ "${#shard_directories[@]}" -eq 0 ]; then
+          echo "No PHPUnit test directories selected for suite $TEST_SUITE shard ${PHPUNIT_TEST_SHARD_INDEX}/${PHPUNIT_TEST_SHARDS_TOTAL}."
+          exit 1
+        fi
+
+        echo -e "${GREEN}Selected ${#shard_directories[@]} of ${#all_shard_directories[@]} plugin integration directories for this shard.${SET}"
+      elif [ -n "$PLUGIN_NAME" ]; then
         if [ -d "plugins/$PLUGIN_NAME/Test" ]; then
           while IFS= read -r -d '' file; do
             all_shard_files+=("$file")
@@ -392,7 +502,9 @@ if [ -n "$TEST_SUITE" ]; then
       fi
     else
       phpunit_command=("${phpunit_base_command[@]}" --testsuite "$TEST_SUITE" "${phpunit_extra_args[@]}")
-      if [ "${#shard_files[@]}" -gt 0 ]; then
+      if [ "${#shard_directories[@]}" -gt 0 ]; then
+        phpunit_command+=("${shard_directories[@]}")
+      elif [ "${#shard_files[@]}" -gt 0 ]; then
         phpunit_command+=("${shard_files[@]}")
       fi
     fi
