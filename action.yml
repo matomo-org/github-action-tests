@@ -214,6 +214,14 @@ runs:
       uses: shivammathur/setup-php@v2
       with:
         php-version: ${{ steps.resolve-php.outputs.version }}
+        # setup-php's default for github-token is ${{ github.token }}, which
+        # gets written into Composer's auth.json. Composer 2.9.7's redaction
+        # regex doesn't match the new GitHub App installation token format,
+        # so tokens leak into logs on error (composer/composer#12849).
+        # Forward inputs.github-token explicitly: callers that don't pass one
+        # get '' (safe default, no auth.json poisoning); callers that need
+        # private composer deps can opt in by passing a token.
+        github-token: ${{ inputs.github-token }}
         extensions: bcmath, ldap, curl, zip, pdo_mysql, mysqli, gd, redis, zlib, opcache
         ini-values: |
           post_max_size=8M,
