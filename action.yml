@@ -184,7 +184,7 @@ runs:
     - name: start redis services
       if: inputs.redis-service == 'true'
       shell: bash
-      run: |ß
+      run: |
         # TODO: Revert to :latest once bitnamisecure re-publishes the libredis.sh chmod fix
         # (https://github.com/bitnami/containers/commit/fb2397d1f8be765c910a48d812515ff09da3a25f).
         # The current :latest (pushed 2026-06-02) ships 8.8.0-debian-12-r0 which fails container init.
