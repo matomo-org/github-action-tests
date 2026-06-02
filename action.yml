@@ -87,6 +87,10 @@ inputs:
     description: "Defines if produced build artifacts should be uploaded or not. Only relevant for System, Plugins and UI tests"
     required: false
     default: false
+  artifact-name-suffix:
+    description: "Optional suffix appended to the uploaded artifact_name (e.g. 'bucket-3'). Use to disambiguate uploads from matrix/split jobs that would otherwise overwrite each other on the artifacts server."
+    required: false
+    default: ''
   setup-script:
     description: "Additional setup script to run before starting tests. Can be used by plugin to e.g. set up LDAP or similar."
     required: false
@@ -372,6 +376,7 @@ runs:
         ARTIFACTS_PROTECTED: ${{ inputs.artifacts-protected == 'true' }}
         TEST_SUITE: ${{ inputs.test-type }}
         PLUGIN_NAME: ${{ inputs.plugin-name }}
+        ARTIFACT_NAME_SUFFIX: ${{ inputs.artifact-name-suffix }}
         GITHUB_REPO: ${{ github.repository }}
         GITHUB_BRANCH: ${{ github.head_ref || github.ref_name }}
         GITHUB_RUN_ID: ${{ github.run-id }}
