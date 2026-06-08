@@ -185,11 +185,8 @@ runs:
       if: inputs.redis-service == 'true'
       shell: bash
       run: |
-        # TODO: Revert to :latest once bitnamisecure re-publishes the libredis.sh chmod fix
-        # (https://github.com/bitnami/containers/commit/fb2397d1f8be765c910a48d812515ff09da3a25f).
-        # The current :latest (pushed 2026-06-02) ships 8.8.0-debian-12-r0 which fails container init.
-        docker run -d --name redis -e ALLOW_EMPTY_PASSWORD=yes -p 6379:6379 bitnamisecure/redis@sha256:1347d526ecec0c6537e99eac09e7c3405c21664f6044ff60e78b0898da37abd2
-        docker run -d --name mymaster -e REDIS_MASTER_HOST=localhost -p 26379:26379 bitnamisecure/redis-sentinel@sha256:96317ad4ce459771b81271607afb9c35a7bb50acb7cad26a273e3c1b5fac581e
+        docker run -d --name redis -e ALLOW_EMPTY_PASSWORD=yes -p 6379:6379 bitnamisecure/redis:latest
+        docker run -d --name mymaster -e REDIS_MASTER_HOST=localhost -p 26379:26379 bitnamisecure/redis-sentinel:latest
 
     - name: Resolve PHP version
       id: resolve-php
