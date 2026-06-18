@@ -36,7 +36,7 @@ This action is able to run certain test suites for Matomo or any Matomo plugin.
 
       If a version is defined in `plugin.json` this version will be tried to check out. If e.g. `>=4.0.0-b1,<5.0.0-b1` is defined it will try to check out `4.0.0-b1`.
 
-      In case the defined version can not be found. e.g. the tag `4.0.0-b1` is not available, it will first try to check out the stable version (if beta provided). e.g. `4.0.0` in this example. If that would also fail it falls back to the development branch of that major version. So `4.x-dev` in that case.
+      In case the defined version can not be found. e.g. the tag `4.0.0-b1` is not available, it will first try to check out the stable version (if beta provided). e.g. `4.0.0` in this example. If that would also fail it falls back to the development branch of that major version. If that branch does not exist either, it falls back to `5.x-dev`.
 
     - **maximum_supported_matomo**
 

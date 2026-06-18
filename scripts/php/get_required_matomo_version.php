@@ -6,9 +6,10 @@
  * @license http://www.gnu.org/licenses/gpl-3.0.html GPL v3 or later
  */
 
-$pathToMatomo     = $argv[1];
-$pluginName       = $argv[2];
-$returnMaxVersion = !empty($argv[3]) && $argv[3] === 'max';
+$pathToMatomo        = $argv[1];
+$pluginName          = $argv[2];
+$returnMaxVersion    = !empty($argv[3]) && $argv[3] === 'max';
+$defaultDevFallback  = '5.x-dev';
 
 // tiny script to get plugin version from plugin.json from a bash script
 require_once $pathToMatomo . '/core/Version.php';
@@ -86,12 +87,11 @@ function getMaxVersion(array $requiredVersions): string
 
         if ($comparison == '<' && preg_match('/^[2-9]\.0\.0-b1$/', $version)) {
             $majorVersion = (int)substr($version, 0, 1) - 1;
-            $maxVersion   = trim(
-                file_get_contents(
-                    'https://api.matomo.org/1.0/getLatestVersion/?release_channel=latest_' . $majorVersion . 'x_beta'
-                )
-            );
             $devBranch    = $majorVersion . '.x-dev';
+            $maxVersion   = @file_get_contents(
+                'https://api.matomo.org/1.0/getLatestVersion/?release_channel=latest_' . $majorVersion . 'x_beta'
+            );
+            $maxVersion   = $maxVersion === false ? '' : trim($maxVersion);
 
             if (empty($maxVersion) || !version_compare($version, $maxVersion, '<=')) {
                 // use dev branch if the latest released version is covered by the supported version
@@ -134,7 +134,7 @@ if ($returnMaxVersion) {
 if (empty($versionToReturn)) {
     $requiredVersions = $allRequiredVersions;
     $versionToReturn  = getMinVersion($requiredVersions);
-    $versionToReturn  = !empty($versionToReturn) ? $versionToReturn : '4.x-dev';
+    $versionToReturn  = !empty($versionToReturn) ? $versionToReturn : $defaultDevFallback;
 }
 
 echo $versionToReturn;
