@@ -12,9 +12,13 @@ echo -e "${GREEN}Using workspace path $WORKSPACE ${SET}"
 
 if [ "$TEST_SUITE" = "UI" ]; then
   cd $WORKSPACE/matomo
-  git lfs pull --exclude=
   if [ "$PLUGIN_NAME" != '' ]; then
+    # Plugin builds only compare the plugin's own screenshots, so skip Matomo
+    # core's screenshots (~124MB) and scope the plugin's pull to its UI dir.
     cd $WORKSPACE/matomo/plugins/$PLUGIN_NAME
+    git lfs pull --include="tests/UI/expected-screenshots/*" --exclude=
+  else
+    # Matomo core build: the calling workflow scopes via `git config lfs.fetchinclude`.
     git lfs pull --exclude=
   fi
   echo -e "${GREEN}setup fonts${SET}"
