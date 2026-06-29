@@ -33,9 +33,8 @@ fi
 
 cd $WORKSPACE/matomo
 echo -e "${GREEN}composer install${SET}"
-# Authenticate composer against the GitHub API to avoid the unauthenticated rate
-# limit (60 req/hour). Resolving dev/commit refs (e.g. matomo-coding-standards)
-# during `composer require`/`install` otherwise returns HTTP 429 throttling.
+# Authenticate composer so GitHub API/git requests are not subject to the
+# unauthenticated 60 req/hour limit (and so private repos can be cloned).
 if [ -n "$GITHUB_TOKEN" ]; then
   composer config --global github-oauth.github.com "$GITHUB_TOKEN"
 fi
@@ -45,6 +44,13 @@ composer install --ignore-platform-reqs
 
 # use PHPUnit 9.x for PHP 8.x
 if [[ "$PHP_VERSION" == "8."* ]]; then
+  # The PHPUnit swap re-resolves the dependency graph, which makes composer
+  # refresh commit metadata for GitHub-hosted dev-master packages (e.g.
+  # matomo-coding-standards) via api.github.com/.../commits/<sha>. That endpoint
+  # hits GitHub's secondary (anti-scraping) rate limit and returns HTTP 429 even
+  # for authenticated requests, aborting the install. Reading that metadata from
+  # a local git clone instead avoids the GitHub API entirely.
+  composer config --global use-github-api false
   composer remove --dev phpunit/phpunit
   # made sure that phpunit version chooses 1.5.0 for doctrine/instantiator
   # because the next version 2.0 introduces incompatible code to php 8.2
