@@ -33,6 +33,12 @@ fi
 
 cd $WORKSPACE/matomo
 echo -e "${GREEN}composer install${SET}"
+# Authenticate composer against the GitHub API to avoid the unauthenticated rate
+# limit (60 req/hour). Resolving dev/commit refs (e.g. matomo-coding-standards)
+# during `composer require`/`install` otherwise returns HTTP 429 throttling.
+if [ -n "$GITHUB_TOKEN" ]; then
+  composer config --global github-oauth.github.com "$GITHUB_TOKEN"
+fi
 # prevents possible error with older Matomo releases, that doesn't include that config
 composer config --no-plugins allow-plugins.dealerdirect/phpcodesniffer-composer-installer false
 composer install --ignore-platform-reqs
