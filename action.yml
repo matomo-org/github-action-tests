@@ -296,6 +296,7 @@ runs:
         PLUGIN_NAME: ${{ inputs.plugin-name }}
         WORKSPACE: ${{ github.workspace }}
         ACTION_PATH: ${{ github.action_path }}
+        GITHUB_TOKEN: ${{ inputs.github-token || github.token }}
 
     - name: checkout additional plugins
       if: inputs.dependent-plugins != ''
