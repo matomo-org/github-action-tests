@@ -90,6 +90,25 @@ jobs:
               throw new Error(`Codex review is restricted to repositories owned by: ${allowedOwners.join(', ')}. Current owner: ${context.repo.owner}.`);
             }
 
+            // Fork pull requests cannot be reviewed: GitHub withholds repository/organization secrets
+            // (including OPENAI_API_KEY) from fork-triggered runs, so Codex could never authenticate.
+            // Skip early with a clear message instead of letting the codex job fail on an empty key.
+            const headRepo = pr.head?.repo?.full_name;
+            const baseRepo = pr.base?.repo?.full_name;
+            if (!headRepo || headRepo !== baseRepo) {
+              core.setOutput('changed_files', '[]');
+              core.setOutput('automation_files', '[]');
+              core.setOutput('should_run', 'false');
+              core.setOutput('safety_failure', 'false');
+              core.setOutput('safety_message', '');
+              core.setOutput('skip_reason', 'fork_pull_request');
+              core.setOutput(
+                'skip_message',
+                'Codex review is not available for pull requests from forks because GitHub does not provide the OPENAI_API_KEY secret to fork-triggered workflow runs. Re-run the review from a branch in this repository instead.'
+              );
+              return;
+            }
+
             // MUST stay byte-identical to CODEX_REVIEW_MARKER in review/post-review.js.
             const codexReviewMarker = 'This Codex review supersedes any previous Codex review output for this PR.';
             const automationPaths = process.env.AUTOMATION_PATHS
@@ -225,6 +244,15 @@ jobs:
           plugin_name="$PLUGIN_NAME_INPUT"
           if [ -z "$plugin_name" ] && [ -f pr/plugin.json ]; then
             plugin_name="$(node -e "const fs = require('fs'); const plugin = JSON.parse(fs.readFileSync('pr/plugin.json', 'utf8')); process.stdout.write(plugin.name || '')")"
+          fi
+
+          # plugin_name may come from the untrusted PR plugin.json and is interpolated into a symlink
+          # path and written to $GITHUB_OUTPUT, so restrict it to a safe plugin-name charset to prevent
+          # path traversal and step-output injection. Matomo plugin names are PHP-namespace/directory
+          # identifiers, so [A-Za-z0-9_] is the valid set. On mismatch, drop the mapping and continue.
+          if [ -n "$plugin_name" ] && ! [[ "$plugin_name" =~ ^[A-Za-z0-9_]+$ ]]; then
+            echo "::warning::Ignoring invalid plugin name; expected characters [A-Za-z0-9_]. Continuing without core-layout mapping."
+            plugin_name=""
           fi
 
           plugin_in_core_path=""

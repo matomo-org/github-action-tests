@@ -46,7 +46,7 @@ function assertInteger(value, name) {
 
 // Defence-in-depth re-validation of the Codex output. The codex-action already constrains the model
 // to review-output.schema.json, so this mirrors that schema as a backstop in case enforcement is
-// absent or changes. Keep this in sync with .github/codex/review-output.schema.json.
+// absent or changes. Keep this in sync with review/review-output.schema.json.
 function validateReview(review) {
   if (!review || typeof review !== 'object' || Array.isArray(review)) {
     throw new Error('Codex output must be a JSON object');
@@ -528,3 +528,9 @@ module.exports = async function postReview({ github, context, core }) {
     throw error;
   }
 };
+
+// Exported for unit testing. The workflow only calls the default postReview export; these named
+// helpers are attached so their logic can be exercised in isolation (see post-review.test.js).
+module.exports.parsePatchLines = parsePatchLines;
+module.exports.validateReview = validateReview;
+module.exports.expectedHighestSeverity = expectedHighestSeverity;
