@@ -534,3 +534,7 @@ module.exports = async function postReview({ github, context, core }) {
 module.exports.parsePatchLines = parsePatchLines;
 module.exports.validateReview = validateReview;
 module.exports.expectedHighestSeverity = expectedHighestSeverity;
+module.exports.buildReviewBody = buildReviewBody;
+module.exports.reviewEventForSeverity = reviewEventForSeverity;
+module.exports.isDismissableCodexReview = isDismissableCodexReview;
+module.exports.CODEX_REVIEW_MARKER = CODEX_REVIEW_MARKER;

@@ -48,8 +48,13 @@ on:
 permissions:
   contents: none
 
+# In a reusable (workflow_call) workflow, ${{ github.workflow }} resolves to the CALLER's
+# workflow name. If the caller is named "Codex Review" and uses github.workflow in its own
+# concurrency group, both groups collide and GitHub cancels with "a deadlock was detected for
+# concurrency group ... between a top level workflow and 'codex-review'". Use a static prefix
+# unique to this reusable workflow so its group can never match the caller's group.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  group: codex-review-reusable-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: true
 
 jobs:

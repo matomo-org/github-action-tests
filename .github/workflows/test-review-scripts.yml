@@ -1,0 +1,34 @@
+name: Test review scripts
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'review/**'
+      - 'package.json'
+      - '.github/workflows/test-review-scripts.yml'
+  pull_request:
+    paths:
+      - 'review/**'
+      - 'package.json'
+      - '.github/workflows/test-review-scripts.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+
+      - name: Run review script tests
+        run: npm test
