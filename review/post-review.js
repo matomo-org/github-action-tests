@@ -178,14 +178,6 @@ function pluralize(count, singular, plural = `${singular}s`) {
   return count === 1 ? singular : plural;
 }
 
-function formatSeverityCounts(findings) {
-  return [
-    `Blocking: ${findings.blocking}`,
-    `Medium: ${findings.medium}`,
-    `Low / Polish: ${findings.low_polish}`,
-  ].join(', ');
-}
-
 function formatSeverityBadge(severity) {
   switch (severity) {
     case 'blocking':
