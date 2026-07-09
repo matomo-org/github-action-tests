@@ -224,8 +224,17 @@ jobs:
         env:
           PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
+          GH_TOKEN: ${{ github.token }}
         run: |
-          git fetch --no-tags origin \
+          set -euo pipefail
+          # The PR checkout uses persist-credentials: false, so pr/.git/config holds no token
+          # (Codex later reads this working tree read-only and must not see credentials).
+          # Authenticate this one fetch with an in-memory extraheader: `git -c` applies the
+          # header for this invocation only and is never written to .git/config. This matches
+          # how actions/checkout authenticates against github.com.
+          auth_header="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
+          git -c "http.https://github.com/.extraheader=$auth_header" \
+            fetch --no-tags origin \
             "$PR_BASE_REF" \
             "+refs/pull/$PR_NUMBER/head"
 
