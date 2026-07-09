@@ -69,7 +69,7 @@ concurrency:
 
 jobs:
   preflight:
-    if: ${{ github.event.label.name == inputs.trigger-label }}
+    if: ${{ github.event.action == 'labeled' && github.event.label.name == inputs.trigger-label }}
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -267,7 +267,10 @@ jobs:
 
           plugin_name="$PLUGIN_NAME_INPUT"
           if [ -z "$plugin_name" ] && [ -f pr/plugin.json ]; then
-            plugin_name="$(node -e "const fs = require('fs'); const plugin = JSON.parse(fs.readFileSync('pr/plugin.json', 'utf8')); process.stdout.write(plugin.name || '')")"
+            # plugin.json comes from the untrusted PR; a malformed file must not abort the review
+            # (set -e would kill the step on a JSON.parse throw), so swallow parse errors and treat
+            # it as "no name", which then falls through to running without a core-layout mapping.
+            plugin_name="$(node -e "try { const fs = require('fs'); const plugin = JSON.parse(fs.readFileSync('pr/plugin.json', 'utf8')); process.stdout.write(typeof plugin.name === 'string' ? plugin.name : ''); } catch (e) { process.stdout.write(''); }")"
           fi
 
           # plugin_name may come from the untrusted PR plugin.json and is interpolated into a symlink
@@ -283,9 +286,12 @@ jobs:
           if [ -n "$plugin_name" ]; then
             mkdir -p matomo-core/plugins
             plugin_in_core_path="$GITHUB_WORKSPACE/matomo-core/plugins/$plugin_name"
-            if [ ! -e "$plugin_in_core_path" ]; then
-              ln -s "$GITHUB_WORKSPACE/pr" "$plugin_in_core_path"
-            fi
+            # The pinned core checkout may already bundle a plugin of this name. Always map the PR
+            # checkout here so Codex inspects the PR's code, not the stale core copy; replace whatever
+            # exists (a real core plugin directory or a leftover link). plugin_name is validated to
+            # [A-Za-z0-9_]+ above, so this rm -rf cannot escape matomo-core/plugins.
+            rm -rf "$plugin_in_core_path"
+            ln -s "$GITHUB_WORKSPACE/pr" "$plugin_in_core_path"
           fi
 
           context_file="$RUNNER_TEMP/codex-review-core-context.json"
@@ -392,7 +398,7 @@ jobs:
 
   post-review:
     needs: [preflight, codex]
-    if: ${{ always() && github.event.label.name == inputs.trigger-label }}
+    if: ${{ always() && github.event.action == 'labeled' && github.event.label.name == inputs.trigger-label }}
     runs-on: ubuntu-24.04
     permissions:
       actions: read
@@ -433,7 +439,7 @@ jobs:
 
   cleanup:
     needs: [preflight, codex, post-review]
-    if: ${{ always() && github.event.label.name == inputs.trigger-label }}
+    if: ${{ always() && github.event.action == 'labeled' && github.event.label.name == inputs.trigger-label }}
     runs-on: ubuntu-24.04
     permissions:
       issues: write
