@@ -179,6 +179,8 @@ address.
 | `matomo-core-repository` | no | `matomo-org/matomo` | Matomo core repository used for read-only review context. |
 | `matomo-core-ref` | no | `84017ed00948fca0db087ea24612723ca8d9df83` | Pinned Matomo core ref used for read-only review context. |
 | `plugin-name` | no | read from `plugin.json` | Plugin name used for the optional core-layout mapping. |
+| `codex-model` | no | `gpt-5.5` | OpenAI model passed to `openai/codex-action`. Override only to move off the default. |
+| `codex-effort` | no | `xhigh` | Reasoning effort passed to `openai/codex-action` (`minimal`, `low`, `medium`, `high`, or `xhigh`). |
 
 ## Secrets
 

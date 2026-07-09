@@ -40,6 +40,16 @@ on:
         description: 'Optional plugin name. If empty, the workflow reads name from plugin.json when present.'
         required: false
         default: ''
+      codex-model:
+        type: string
+        description: 'OpenAI model passed to openai/codex-action. Override only to move off the default.'
+        required: false
+        default: 'gpt-5.5'
+      codex-effort:
+        type: string
+        description: 'Reasoning effort passed to openai/codex-action (Codex model_reasoning_effort): minimal, low, medium, high, or xhigh.'
+        required: false
+        default: 'xhigh'
     secrets:
       OPENAI_API_KEY:
         description: 'OpenAI API key used by openai/codex-action.'
@@ -358,6 +368,8 @@ jobs:
         uses: openai/codex-action@10cb888d2ed3b99867f7e7ccff174a861a75aeb6
         with:
           openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          model: ${{ inputs.codex-model }}
+          effort: ${{ inputs.codex-effort }}
           prompt-file: ${{ runner.temp }}/codex-review-prompt.md
           output-file: ${{ runner.temp }}/codex-review-output.json
           output-schema-file: ${{ github.workspace }}/github-action-tests/review/review-output.schema.json
