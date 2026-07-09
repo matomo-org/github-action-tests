@@ -32,9 +32,9 @@ test('parsePatchLines: null and empty patches produce empty sets', () => {
 });
 
 test('parsePatchLines: maps added, removed, and context lines to the correct sides', () => {
+  // The `patch` field from pulls.listFiles starts at the first @@ hunk header and contains no
+  // `---`/`+++` file-header lines, so this fixture deliberately omits them.
   const patch = [
-    '--- a/file.txt',
-    '+++ b/file.txt',
     '@@ -10,3 +10,4 @@ function context()',
     ' context1',
     '-removed',
@@ -56,6 +56,41 @@ test('parsePatchLines: handles single-line hunk headers without counts', () => {
   const { right, left } = parsePatchLines(patch);
   assert.deepEqual([...right], [1]);
   assert.deepEqual([...left], [1]);
+});
+
+test('parsePatchLines: counts source lines that begin with ++ or -- (not file headers)', () => {
+  // A hunk `patch` never contains `---`/`+++` file headers, so an added line whose source begins
+  // with `++` renders as `+++...` and a removed line whose source begins with `--` renders as
+  // `---...`. These are real content lines and must advance the line counters.
+  const patch = [
+    '@@ -1,2 +1,3 @@',
+    ' ctx',
+    '---removedDashes',
+    '+++addedPluses',
+    '+afterAdded',
+  ].join('\n');
+
+  const { right, left } = parsePatchLines(patch);
+
+  // ctx=1, +++addedPluses=2, +afterAdded=3 on the new side; ctx=1, ---removedDashes=2 on the old.
+  assert.deepEqual([...right].sort((a, b) => a - b), [1, 2, 3]);
+  assert.deepEqual([...left].sort((a, b) => a - b), [1, 2]);
+});
+
+test('parsePatchLines: resets line counters across multiple hunks', () => {
+  const patch = [
+    '@@ -1,2 +1,2 @@',
+    ' a',
+    '+b',
+    '@@ -10,2 +20,2 @@',
+    ' c',
+    '+d',
+  ].join('\n');
+
+  const { right, left } = parsePatchLines(patch);
+
+  assert.deepEqual([...right].sort((a, b) => a - b), [1, 2, 20, 21]);
+  assert.deepEqual([...left].sort((a, b) => a - b), [1, 10]);
 });
 
 // --- validateReview ---------------------------------------------------------
@@ -89,6 +124,50 @@ test('validateReview: recomputes highest_severity from the finding counts', () =
     validateReview(review);
     assert.equal(review.highest_severity, expected);
   }
+});
+
+test('validateReview: raises highest_severity to the severest inline/unplaced finding', () => {
+  // Counts claim no findings, but a blocking inline comment is present: the review must be treated
+  // as blocking so it is posted as REQUEST_CHANGES rather than a "no findings" COMMENT.
+  const blockingComment = validReview({
+    findings: { blocking: 0, medium: 0, low_polish: 0 },
+    highest_severity: 'none',
+    inline_comments: [
+      { path: 'a.js', line: 1, side: 'RIGHT', severity: 'blocking', body: 'b', rule_source: null },
+    ],
+  });
+  validateReview(blockingComment);
+  assert.equal(blockingComment.highest_severity, 'blocking');
+
+  // Likewise an unplaced medium finding outranks all-zero counts.
+  const mediumUnplaced = validReview({
+    findings: { blocking: 0, medium: 0, low_polish: 0 },
+    highest_severity: 'none',
+    unplaced_findings: [{ severity: 'medium', body: 'b', path: null, line: null }],
+  });
+  validateReview(mediumUnplaced);
+  assert.equal(mediumUnplaced.highest_severity, 'medium');
+
+  // The count-based severity still wins when it is higher than any individual comment.
+  const countsWin = validReview({
+    findings: { blocking: 1, medium: 0, low_polish: 0 },
+    highest_severity: 'none',
+    inline_comments: [
+      { path: 'a.js', line: 1, side: 'RIGHT', severity: 'low', body: 'b', rule_source: null },
+    ],
+  });
+  validateReview(countsWin);
+  assert.equal(countsWin.highest_severity, 'blocking');
+});
+
+test('validateReview: accepts unplaced findings with path and line omitted entirely', () => {
+  // The schema marks path/line as optional (nullable) for unplaced findings, so a payload that
+  // omits them must pass the backstop validator too.
+  const review = validReview({
+    findings: { blocking: 0, medium: 1, low_polish: 0 },
+    unplaced_findings: [{ severity: 'medium', body: 'b' }],
+  });
+  assert.doesNotThrow(() => validateReview(review));
 });
 
 test('validateReview: rejects non-object payloads', () => {
@@ -226,26 +305,43 @@ test('buildReviewBody: embeds the marker, the severity table, and the inline-cou
 
 // --- postReview orchestration (fake GitHub client, no network) ---------------
 
-function fakeGithub({ files = [], reviews = [], createReviewErrors = [] } = {}) {
-  const calls = { createReview: [], dismissReview: [], createComment: [], listFiles: 0, listReviews: 0 };
+function fakeGithub({
+  files = [],
+  reviews = [],
+  createReviewErrors = [],
+  dismissReviewErrors = [],
+  listFilesError = null,
+  listReviewsError = null,
+} = {}) {
+  // `order` records the sequence of mutating API calls so tests can assert, e.g., that the new
+  // review is created before previous ones are dismissed.
+  const calls = { createReview: [], dismissReview: [], createComment: [], listFiles: 0, listReviews: 0, order: [] };
   let createReviewCall = 0;
+  let dismissReviewCall = 0;
   const github = {
     // The real code calls github.paginate(fn, params); the fake ignores params and invokes fn.
     paginate: async (fn) => fn(),
     rest: {
       pulls: {
-        listFiles: async () => { calls.listFiles += 1; return files; },
-        listReviews: async () => { calls.listReviews += 1; return reviews; },
+        listFiles: async () => { calls.listFiles += 1; if (listFilesError) throw listFilesError; return files; },
+        listReviews: async () => { calls.listReviews += 1; if (listReviewsError) throw listReviewsError; return reviews; },
         createReview: async (params) => {
           calls.createReview.push(params);
+          calls.order.push('createReview');
           const err = createReviewErrors[createReviewCall];
           createReviewCall += 1;
           if (err) throw err;
         },
-        dismissReview: async (params) => { calls.dismissReview.push(params); },
+        dismissReview: async (params) => {
+          calls.dismissReview.push(params);
+          calls.order.push('dismissReview');
+          const err = dismissReviewErrors[dismissReviewCall];
+          dismissReviewCall += 1;
+          if (err) throw err;
+        },
       },
       issues: {
-        createComment: async (params) => { calls.createComment.push(params); },
+        createComment: async (params) => { calls.createComment.push(params); calls.order.push('createComment'); },
       },
     },
   };
@@ -447,10 +543,11 @@ test('postReview: retries without inline comments when GitHub rejects them with 
   assert.equal(calls.createReview[0].comments.length, 1); // first attempt: inline
   assert.equal(calls.createReview[1].comments.length, 0); // fallback: comment-free
   assert.match(calls.createReview[1].body, /Bug here/); // finding folded into the body
+  assert.equal(calls.createReview[1].event, 'REQUEST_CHANGES'); // fallback must not downgrade the verdict
   assert.ok(core.warnings.some((w) => /Retrying without inline comments/.test(w)));
 });
 
-test('postReview: dismisses a previous blocking Codex review before posting', async (t) => {
+test('postReview: dismisses a previous blocking Codex review after posting the new one', async (t) => {
   const previous = {
     id: 555,
     user: { login: 'github-actions[bot]' },
@@ -472,6 +569,172 @@ test('postReview: dismisses a previous blocking Codex review before posting', as
   assert.equal(calls.dismissReview[0].review_id, 555);
   assert.equal(calls.createReview.length, 1);
   assert.equal(calls.createReview[0].event, 'COMMENT'); // no findings -> COMMENT, never APPROVE
+  // The new review must be created before the old one is dismissed, so a create failure can never
+  // leave the PR with no Codex review at all.
+  assert.deepEqual(calls.order, ['createReview', 'dismissReview']);
+});
+
+test('postReview: does not dismiss previous reviews when creating the new review fails', async (t) => {
+  const previous = {
+    id: 555,
+    user: { login: 'github-actions[bot]' },
+    state: 'CHANGES_REQUESTED',
+    body: `old ${CODEX_REVIEW_MARKER}`,
+  };
+  const file = writeTempReview(t, reviewJson());
+  setEnv(t, {
+    PREFLIGHT_SAFETY_FAILURE: 'false',
+    PREFLIGHT_SKIP_REASON: '',
+    CODEX_RESULT: 'success',
+    RUN_URL: 'https://example/run',
+    CODEX_OUTPUT_FILE: file,
+  });
+  // A non-403/422 error is not recoverable and must propagate, but the previous blocking review
+  // must be left in place so the PR is not silently unblocked.
+  const failure = Object.assign(new Error('server error'), { status: 500 });
+  const { github, calls } = fakeGithub({ files: [], reviews: [previous], createReviewErrors: [failure] });
+  await assert.rejects(() => postReview({ github, context: fakeContext(), core: fakeCore() }), /server error/);
+
+  assert.equal(calls.createReview.length, 1);
+  assert.equal(calls.dismissReview.length, 0);
+});
+
+test('postReview: requests changes when a blocking inline comment is present despite zero counts', async (t) => {
+  const patch = ['@@ -1,2 +1,4 @@', ' line1', ' line2', '+line3', '+line4'].join('\n');
+  const file = writeTempReview(t, reviewJson({
+    highest_severity: 'none',
+    findings: { blocking: 0, medium: 0, low_polish: 0 },
+    inline_comments: [{ path: 'a.js', line: 3, side: 'RIGHT', severity: 'blocking', body: 'Serious bug', rule_source: null }],
+  }));
+  setEnv(t, {
+    PREFLIGHT_SAFETY_FAILURE: 'false',
+    PREFLIGHT_SKIP_REASON: '',
+    CODEX_RESULT: 'success',
+    RUN_URL: 'https://example/run',
+    CODEX_OUTPUT_FILE: file,
+  });
+  const { github, calls } = fakeGithub({ files: [{ filename: 'a.js', patch }] });
+  await postReview({ github, context: fakeContext(), core: fakeCore() });
+
+  assert.equal(calls.createReview.length, 1);
+  assert.equal(calls.createReview[0].event, 'REQUEST_CHANGES');
+});
+
+test('postReview: posts a comment instead of crashing when listing PR files fails', async (t) => {
+  const file = writeTempReview(t, reviewJson());
+  setEnv(t, {
+    PREFLIGHT_SAFETY_FAILURE: 'false',
+    PREFLIGHT_SKIP_REASON: '',
+    CODEX_RESULT: 'success',
+    RUN_URL: 'https://example/run/77',
+    CODEX_OUTPUT_FILE: file,
+  });
+  const listFilesError = Object.assign(new Error('boom'), { status: 500 });
+  const { github, calls } = fakeGithub({ listFilesError });
+  const core = fakeCore();
+  // Must resolve (not reject): a valid Codex review should still yield PR feedback.
+  await postReview({ github, context: fakeContext(), core });
+
+  assert.equal(calls.createReview.length, 0);
+  assert.equal(calls.createComment.length, 1);
+  assert.match(calls.createComment[0].body, /changed-file list could not be retrieved/);
+});
+
+test('postReview: degrades to a plain comment when the token cannot submit a review (403)', async (t) => {
+  const previous = {
+    id: 555,
+    user: { login: 'github-actions[bot]' },
+    state: 'CHANGES_REQUESTED',
+    body: `old ${CODEX_REVIEW_MARKER}`,
+  };
+  const file = writeTempReview(t, reviewJson());
+  setEnv(t, {
+    PREFLIGHT_SAFETY_FAILURE: 'false',
+    PREFLIGHT_SKIP_REASON: '',
+    CODEX_RESULT: 'success',
+    RUN_URL: 'https://example/run',
+    CODEX_OUTPUT_FILE: file,
+  });
+  const forbidden = Object.assign(new Error('forbidden'), { status: 403 });
+  const { github, calls } = fakeGithub({ files: [], reviews: [previous], createReviewErrors: [forbidden] });
+  await postReview({ github, context: fakeContext(), core: fakeCore() });
+
+  assert.equal(calls.createReview.length, 1);
+  assert.equal(calls.createComment.length, 1);
+  assert.match(calls.createComment[0].body, /could not submit a pull request review/);
+  // A failed create must not dismiss the previous blocking review.
+  assert.equal(calls.dismissReview.length, 0);
+});
+
+test('postReview: promotes a locatable unplaced finding to an inline comment', async (t) => {
+  const patch = ['@@ -1,2 +1,4 @@', ' line1', ' line2', '+line3', '+line4'].join('\n');
+  const file = writeTempReview(t, reviewJson({
+    findings: { blocking: 0, medium: 1, low_polish: 0 },
+    unplaced_findings: [{ severity: 'medium', body: 'Promote me', path: 'a.js', line: 3 }],
+  }));
+  setEnv(t, {
+    PREFLIGHT_SAFETY_FAILURE: 'false',
+    PREFLIGHT_SKIP_REASON: '',
+    CODEX_RESULT: 'success',
+    RUN_URL: 'https://example/run',
+    CODEX_OUTPUT_FILE: file,
+  });
+  const { github, calls } = fakeGithub({ files: [{ filename: 'a.js', patch }] });
+  await postReview({ github, context: fakeContext(), core: fakeCore() });
+
+  assert.equal(calls.createReview.length, 1);
+  assert.equal(calls.createReview[0].comments.length, 1);
+  const comment = calls.createReview[0].comments[0];
+  assert.equal(comment.path, 'a.js');
+  assert.equal(comment.line, 3);
+  assert.equal(comment.side, 'RIGHT');
+  assert.match(comment.body, /Promote me/);
+  // Promoted findings are not also listed as unplaced.
+  assert.doesNotMatch(calls.createReview[0].body, /Unplaced findings/);
+});
+
+test('postReview: still posts the new review when dismissing a previous review fails', async (t) => {
+  const previous = {
+    id: 555,
+    user: { login: 'github-actions[bot]' },
+    state: 'CHANGES_REQUESTED',
+    body: `old ${CODEX_REVIEW_MARKER}`,
+  };
+  const file = writeTempReview(t, reviewJson());
+  setEnv(t, {
+    PREFLIGHT_SAFETY_FAILURE: 'false',
+    PREFLIGHT_SKIP_REASON: '',
+    CODEX_RESULT: 'success',
+    RUN_URL: 'https://example/run',
+    CODEX_OUTPUT_FILE: file,
+  });
+  const forbidden = Object.assign(new Error('cannot dismiss'), { status: 403 });
+  const { github, calls } = fakeGithub({ files: [], reviews: [previous], dismissReviewErrors: [forbidden] });
+  const core = fakeCore();
+  await postReview({ github, context: fakeContext(), core });
+
+  assert.equal(calls.createReview.length, 1);
+  assert.equal(calls.dismissReview.length, 1);
+  assert.ok(core.warnings.some((w) => /Could not dismiss previous Codex review/.test(w)));
+});
+
+test('postReview: still posts the new review when listing previous reviews fails', async (t) => {
+  const file = writeTempReview(t, reviewJson());
+  setEnv(t, {
+    PREFLIGHT_SAFETY_FAILURE: 'false',
+    PREFLIGHT_SKIP_REASON: '',
+    CODEX_RESULT: 'success',
+    RUN_URL: 'https://example/run',
+    CODEX_OUTPUT_FILE: file,
+  });
+  const listReviewsError = Object.assign(new Error('list failed'), { status: 500 });
+  const { github, calls } = fakeGithub({ files: [], listReviewsError });
+  const core = fakeCore();
+  await postReview({ github, context: fakeContext(), core });
+
+  assert.equal(calls.createReview.length, 1);
+  assert.equal(calls.dismissReview.length, 0);
+  assert.ok(core.warnings.some((w) => /Could not list previous pull request reviews/.test(w)));
 });
 
 // --- cross-file invariant ---------------------------------------------------

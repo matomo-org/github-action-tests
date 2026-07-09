@@ -68,11 +68,6 @@ function validateReview(review) {
   assertInteger(findings.medium, 'findings.medium');
   assertInteger(findings.low_polish, 'findings.low_polish');
 
-  // Treat the finding counts as authoritative and recompute highest_severity from them rather than
-  // rejecting the whole review over a trivial model inconsistency. Downstream consumers
-  // (reviewEventForSeverity) then use the trustworthy value.
-  review.highest_severity = expectedHighestSeverity(findings);
-
   if (!Array.isArray(review.inline_comments)) {
     throw new Error('inline_comments must be an array');
   }
@@ -112,6 +107,21 @@ function validateReview(review) {
       throw new Error(`unplaced_findings[${index}].line must be a positive integer or null`);
     }
   }
+
+  // Recompute highest_severity from trustworthy signals rather than trusting the model's own value.
+  // The counts drive the baseline, but an individual inline/unplaced finding may carry a higher
+  // severity than the counts imply; in that case the review must reflect the severest finding so
+  // reviewEventForSeverity does not post a blocking finding as a non-blocking COMMENT.
+  const highestFromCounts = expectedHighestSeverity(findings);
+  const findingSeverities = [
+    ...review.inline_comments.map((comment) => comment.severity),
+    ...review.unplaced_findings.map((finding) => finding.severity),
+  ];
+  review.highest_severity = findingSeverities.reduce(
+    (highest, severity) =>
+      SEVERITIES.indexOf(severity) > SEVERITIES.indexOf(highest) ? severity : highest,
+    highestFromCounts,
+  );
 }
 
 function readReviewOutput(path) {
@@ -140,7 +150,12 @@ function parsePatchLines(patch) {
       continue;
     }
 
-    if (line.startsWith('+++') || line.startsWith('---') || line.startsWith('\\')) {
+    // The pulls.listFiles `patch` starts at the first @@ header and never contains `---`/`+++`
+    // file-header lines, so we must NOT skip those prefixes here: a real added line whose source
+    // begins with `++` renders as `+++...` and a removed line beginning with `--` renders as
+    // `---...`, and skipping them would desynchronise every following line number in the hunk. Only
+    // the "\ No newline at end of file" marker needs to be ignored.
+    if (line.startsWith('\\')) {
       continue;
     }
 
@@ -386,12 +401,27 @@ module.exports = async function postReview({ github, context, core }) {
     return;
   }
 
-  const files = await github.paginate(github.rest.pulls.listFiles, {
-    owner: context.repo.owner,
-    repo: context.repo.repo,
-    pull_number: pr.number,
-    per_page: 100,
-  });
+  let files;
+  try {
+    files = await github.paginate(github.rest.pulls.listFiles, {
+      owner: context.repo.owner,
+      repo: context.repo.repo,
+      pull_number: pr.number,
+      per_page: 100,
+    });
+  } catch (error) {
+    // Without the changed-file patches we cannot map inline comments, and every other API path
+    // degrades to a comment rather than a hard failure. Do the same so a valid Codex review still
+    // surfaces some PR feedback instead of an opaque crashed step.
+    core.warning(`Could not list pull request files: ${error.message}`);
+    await createIssueComment({
+      github,
+      context,
+      core,
+      body: `Codex review completed, but the changed-file list could not be retrieved, so no review was posted. Workflow run: ${runUrl}`,
+    });
+    return;
+  }
 
   // listFiles returns patches for at most ~300 files and omits patches for very large or binary
   // files. Inline comments targeting those paths get an empty patch here and fall through to
@@ -473,13 +503,6 @@ module.exports = async function postReview({ github, context, core }) {
   core.info(`Codex review: placing ${comments.length} inline ${comments.length === 1 ? 'comment' : 'comments'}, ${unplaced.length} unplaced, event=${event}.`);
 
   try {
-    await dismissPreviousCodexReviews({
-      github,
-      context,
-      core,
-      runUrl,
-    });
-
     await github.rest.pulls.createReview({
       owner: context.repo.owner,
       repo: context.repo.repo,
@@ -496,12 +519,14 @@ module.exports = async function postReview({ github, context, core }) {
         core,
         body: `Codex review completed, but the workflow token could not submit a pull request review. Workflow run: ${runUrl}`,
       });
+      // The new review was never posted, so leave any previous (possibly blocking) review in place.
       return;
     }
 
     // GitHub rejects the whole review with 422 if a single inline comment lands on a line it does
     // not consider commentable. Rather than lose every finding, retry once without inline comments
-    // and fold them into the body as unplaced findings.
+    // and fold them into the body as unplaced findings. A failure of this retry propagates
+    // (skipping the dismissal below), again leaving any previous review in place.
     if (error.status === 422 && comments.length > 0) {
       core.warning(`GitHub rejected the inline comments (422): ${error.message}. Retrying without inline comments.`);
       const fallbackBody = buildReviewBody(review, [...unplaced, ...placedFindings], 0);
@@ -514,11 +539,15 @@ module.exports = async function postReview({ github, context, core }) {
         comments: [],
       });
       core.info('Posted a comment-free Codex review after the inline comments were rejected.');
-      return;
+    } else {
+      throw error;
     }
-
-    throw error;
   }
+
+  // Supersede earlier Codex reviews only after the new review has been posted. Dismissing first
+  // risked removing a previous blocking review and then failing to post the replacement, silently
+  // unblocking the PR.
+  await dismissPreviousCodexReviews({ github, context, core, runUrl });
 };
 
 // Exported for unit testing. The workflow only calls the default postReview export; these named
