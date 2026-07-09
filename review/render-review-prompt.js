@@ -1,16 +1,5 @@
 const fs = require('fs');
-
-function requiredEnv(name) {
-  const value = process.env[name];
-  if (value === undefined || value === '') {
-    throw new Error(`Missing required environment variable: ${name}`);
-  }
-  return value;
-}
-
-function optionalEnv(name) {
-  return process.env[name] || '';
-}
+const { requiredEnv, optionalEnv } = require('./env-utils');
 
 function renderTemplate(input, replacements) {
   // Resolve every {{KEY}} in a single pass over the original template so that values substituted
