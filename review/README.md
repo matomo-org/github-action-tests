@@ -77,18 +77,96 @@ comments must use the actual changed paths from the PR diff.
 
 ## Security Model
 
-- The caller wrapper runs only for pull request label events where the label is
-  `codex-review`.
-- The called workflow fails before using the OpenAI key unless the repository
-  owner is in the `allowed-owners` input. The default is `matomo-org,innocraft`.
-- Trusted scripts are checked out from the shared workflow repository at
-  `job.workflow_sha`, not from the caller repository.
-- The PR merge ref is checked out with `persist-credentials: false`.
-- Codex runs with `sandbox: read-only`, `safety-strategy: drop-sudo`, disabled
-  web search, and an environment policy that excludes common secret variables.
-- PR-provided agent instructions are treated as PR content, not trusted workflow
-  instructions.
-- PRs changing reviewer automation paths are skipped and require human review.
+This workflow runs an autonomous AI agent (Codex) over pull request content. The
+design treats **everything in the PR as untrusted** — the diff, commit messages,
+the PR title and body, `plugin.json`, and any `AGENTS.md`/`.codex`-style agent
+instruction files. It assumes an attacker may open a PR (or push a branch) for
+the sole purpose of making the reviewer leak a secret or take an unwanted action.
+
+The reason this is safe to use is that no single control is load-bearing: the two
+secrets in play (`OPENAI_API_KEY` and the `GITHUB_TOKEN`) are kept away from the
+agent by several independent layers, and the agent runs sandboxed and read-only
+even if a layer were bypassed. The controls below are grouped by the risk they
+address.
+
+### Who can trigger a review
+
+- The caller wrapper runs **only** on `pull_request` `labeled` events where the
+  label is `codex-review`, so an ordinary push never starts a review.
+- Applying that label is the trust decision. Restrict who can label PRs in each
+  consuming repository (see *Required Repository Setup*).
+- The called workflow refuses to use the OpenAI key unless the repository owner
+  is in `allowed-owners` (default `matomo-org,innocraft`); a fork of this
+  workflow under another owner cannot run it.
+- **Fork PRs are skipped before Codex runs.** GitHub withholds repository and
+  organization secrets from fork-triggered runs, so a fork could never
+  authenticate anyway; the preflight detects `head repo != base repo` and exits
+  with an explanatory message rather than failing later on an empty key. This
+  also means untrusted contributor code only ever reaches Codex after a
+  maintainer with label rights has pulled it into a branch of the repo itself.
+
+### The agent runs trusted code against an untrusted target
+
+- The review scripts, prompt, and JSON schema are checked out from **this**
+  shared workflow repository at `job.workflow_sha` (the pinned trusted commit),
+  never from the caller/PR. A PR that edits `review/*` cannot change what
+  actually executes.
+- The PR is checked out into a separate `pr/` directory that is only ever the
+  *target* of read-only inspection — it is not a source of executable workflow
+  logic.
+- As defense in depth, a PR that touches reviewer automation paths
+  (`.github/workflows/codex-review.yml`, `.github/codex/`, configurable via
+  `automation-paths`) is skipped and flagged for human review first.
+- The plugin name read from the untrusted `plugin.json` is validated against
+  `^[A-Za-z0-9_]+$` before it is used in a filesystem path or written to a step
+  output, preventing path traversal and step-output injection.
+
+### Secrets never reach the agent
+
+- The workflow token defaults to `permissions: contents: none`, and each job
+  requests only what it needs. The Codex job holds **`contents: read` only** — it
+  cannot write code, comments, or labels.
+- Every checkout, including the PR, uses `persist-credentials: false`, so no
+  `GITHUB_TOKEN` is left in `pr/.git/config` for the agent to harvest.
+- The one place the token is still needed — fetching the base and head refs so
+  the diff can be computed — supplies it through an **in-memory**
+  `git -c http.extraheader` that is never written to disk. After that step the
+  working tree Codex reads contains no credential material.
+- Codex's shell runs under an environment policy that strips secret-bearing
+  variables (`*KEY*`, `*SECRET*`, `*TOKEN*`, `GITHUB_*`, `ACTIONS_*`, `OPENAI_*`,
+  `CODEX_*`). Even a prompt-injected command cannot echo the OpenAI key or the
+  GitHub token out of the environment.
+- `OPENAI_API_KEY` is consumed only by the `openai/codex-action` step (pinned by
+  commit SHA) and is always supplied by the consuming repo/org — this repository
+  ships no central key.
+
+### The agent is sandboxed
+
+- Codex runs with `sandbox: read-only` (it cannot modify the checkout or the
+  runner), `safety-strategy: drop-sudo` (no privilege escalation), `web_search`
+  disabled (no exfiltration channel or untrusted fetches), and
+  `project_doc_max_bytes = 0` (PR-provided project docs are not auto-loaded as
+  instructions).
+
+### Prompt-injection resistance
+
+- The prompt establishes an explicit trust policy: the workflow prompt and the
+  skills installed from the trusted `matomo-org/matomo-agent-skills` repository
+  are authoritative, and PR-provided `AGENTS.md`/`.codex`/`.agents/skills` files
+  are to be treated as reviewed content only — never as instructions, and never
+  executed.
+- PR title and body are injected into the prompt with a single-pass template
+  render, so untrusted values cannot re-trigger substitution to smuggle in new
+  placeholders.
+
+### Review and posting are separated
+
+- Codex (read-only, untrusted-input-facing) only emits a structured JSON file
+  validated against `review-output.schema.json`.
+- A **separate** `post-review` job — which never runs Codex — holds the
+  `issues: write` / `pull-requests: write` permissions and turns that validated
+  output into the GitHub review. The component that writes to the PR is not the
+  component exposed to untrusted input.
 
 ## Inputs
 
