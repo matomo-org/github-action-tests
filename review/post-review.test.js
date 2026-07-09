@@ -19,6 +19,7 @@ const {
   reviewEventForSeverity,
   isDismissableCodexReview,
   CODEX_REVIEW_MARKER,
+  CODEX_INLINE_MARKER,
 } = postReview;
 
 // --- parsePatchLines --------------------------------------------------------
@@ -308,14 +309,19 @@ test('buildReviewBody: embeds the marker, the severity table, and the inline-cou
 function fakeGithub({
   files = [],
   reviews = [],
+  reviewComments = [],
   createReviewErrors = [],
   dismissReviewErrors = [],
   listFilesError = null,
   listReviewsError = null,
 } = {}) {
   // `order` records the sequence of mutating API calls so tests can assert, e.g., that the new
-  // review is created before previous ones are dismissed.
-  const calls = { createReview: [], dismissReview: [], createComment: [], listFiles: 0, listReviews: 0, order: [] };
+  // review is created before previous ones are dismissed. createReview returns an incrementing
+  // review id so the stale-inline-comment cleanup can distinguish the new review from prior ones.
+  const calls = {
+    createReview: [], dismissReview: [], createComment: [],
+    deleteReviewComment: [], listFiles: 0, listReviews: 0, listReviewComments: 0, order: [],
+  };
   let createReviewCall = 0;
   let dismissReviewCall = 0;
   const github = {
@@ -325,12 +331,15 @@ function fakeGithub({
       pulls: {
         listFiles: async () => { calls.listFiles += 1; if (listFilesError) throw listFilesError; return files; },
         listReviews: async () => { calls.listReviews += 1; if (listReviewsError) throw listReviewsError; return reviews; },
+        listReviewComments: async () => { calls.listReviewComments += 1; return reviewComments; },
         createReview: async (params) => {
           calls.createReview.push(params);
           calls.order.push('createReview');
           const err = createReviewErrors[createReviewCall];
+          const id = 1000 + createReviewCall;
           createReviewCall += 1;
           if (err) throw err;
+          return { data: { id } };
         },
         dismissReview: async (params) => {
           calls.dismissReview.push(params);
@@ -339,6 +348,7 @@ function fakeGithub({
           dismissReviewCall += 1;
           if (err) throw err;
         },
+        deleteReviewComment: async (params) => { calls.deleteReviewComment.push(params); calls.order.push('deleteReviewComment'); },
       },
       issues: {
         createComment: async (params) => { calls.createComment.push(params); calls.order.push('createComment'); },
@@ -489,6 +499,7 @@ test('postReview: places an inline comment that maps to a changed diff line', as
   assert.equal(submitted.comments[0].path, 'a.js');
   assert.equal(submitted.comments[0].line, 3);
   assert.equal(submitted.comments[0].side, 'RIGHT');
+  assert.ok(submitted.comments[0].body.includes(CODEX_INLINE_MARKER)); // enables later stale-comment cleanup
   assert.ok(submitted.body.includes(CODEX_REVIEW_MARKER));
   assert.equal(calls.createComment.length, 0);
 });
@@ -735,6 +746,47 @@ test('postReview: still posts the new review when listing previous reviews fails
   assert.equal(calls.createReview.length, 1);
   assert.equal(calls.dismissReview.length, 0);
   assert.ok(core.warnings.some((w) => /Could not list previous pull request reviews/.test(w)));
+});
+
+test('postReview: deletes stale Codex inline comments from previous runs but keeps the new ones', async (t) => {
+  // Dismissing a previous review does not remove its inline comments, so they accumulate across runs.
+  // The new review carries pull_request_review_id 1000 (the fake createReview id); prior Codex inline
+  // comments carry a different id and must be deleted, while human comments and the new review's own
+  // comments are left untouched.
+  const staleCodex = {
+    id: 11, user: { login: 'github-actions[bot]' },
+    body: `stale finding\n${CODEX_INLINE_MARKER}`, pull_request_review_id: 42,
+  };
+  const humanComment = {
+    id: 12, user: { login: 'alice' },
+    body: `looks fine ${CODEX_INLINE_MARKER}`, pull_request_review_id: 43,
+  };
+  const botNonCodex = {
+    id: 13, user: { login: 'github-actions[bot]' },
+    body: 'unrelated bot comment', pull_request_review_id: 44,
+  };
+  const newReviewComment = {
+    id: 14, user: { login: 'github-actions[bot]' },
+    body: `fresh finding\n${CODEX_INLINE_MARKER}`, pull_request_review_id: 1000,
+  };
+
+  const file = writeTempReview(t, reviewJson());
+  setEnv(t, {
+    PREFLIGHT_SAFETY_FAILURE: 'false',
+    PREFLIGHT_SKIP_REASON: '',
+    CODEX_RESULT: 'success',
+    RUN_URL: 'https://example/run',
+    CODEX_OUTPUT_FILE: file,
+  });
+  const { github, calls } = fakeGithub({
+    files: [],
+    reviewComments: [staleCodex, humanComment, botNonCodex, newReviewComment],
+  });
+  await postReview({ github, context: fakeContext(), core: fakeCore() });
+
+  assert.equal(calls.createReview.length, 1);
+  // Only the stale Codex inline comment is deleted.
+  assert.deepEqual(calls.deleteReviewComment.map((c) => c.comment_id), [11]);
 });
 
 // --- cross-file invariant ---------------------------------------------------

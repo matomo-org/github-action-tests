@@ -1,23 +1,20 @@
 const fs = require('fs');
+const { requiredEnv } = require('./env-utils');
 
+// Severity ranked low->high; index doubles as the ordering used to reconcile highest_severity.
 const SEVERITIES = ['none', 'low', 'medium', 'blocking'];
+// The subset a finding/comment may carry ('none' is a review-level state, not a per-finding value).
+const FINDING_SEVERITIES = SEVERITIES.filter((severity) => severity !== 'none');
 
 // Sentinel embedded in every Codex review body so later runs can recognise and supersede their own
 // previous reviews. The preflight job in .github/workflows/codex-review.yml matches this exact
 // string to deduplicate runs, so it MUST stay byte-identical to the literal there.
 const CODEX_REVIEW_MARKER = 'This Codex review supersedes any previous Codex review output for this PR.';
 
-// Unlike requiredEnv in render-review-prompt.js, this intentionally accepts an empty string: this
-// script runs with `if: always()`, so a passthrough output such as PREFLIGHT_SAFETY_FAILURE can be
-// an empty string when the preflight job did not complete, and that must be handled rather than
-// throw. Only a genuinely unset (undefined) variable is treated as missing here.
-function requiredEnv(name) {
-  const value = process.env[name];
-  if (value === undefined) {
-    throw new Error(`Missing required environment variable: ${name}`);
-  }
-  return value;
-}
+// Hidden marker embedded in every inline review comment. Dismissing a superseded review does not
+// remove its inline comments, so each run finds and deletes prior Codex inline comments by this
+// marker to stop them accumulating across runs.
+const CODEX_INLINE_MARKER = '<!-- codex-review-inline -->';
 
 function expectedHighestSeverity(findings) {
   if (findings.blocking > 0) {
@@ -83,7 +80,7 @@ function validateReview(review) {
     if (!['LEFT', 'RIGHT'].includes(comment.side)) {
       throw new Error(`inline_comments[${index}].side must be LEFT or RIGHT`);
     }
-    if (!['low', 'medium', 'blocking'].includes(comment.severity)) {
+    if (!FINDING_SEVERITIES.includes(comment.severity)) {
       throw new Error(`inline_comments[${index}].severity is invalid`);
     }
     assertString(comment.body, `inline_comments[${index}].body`);
@@ -94,7 +91,7 @@ function validateReview(review) {
   }
 
   for (const [index, finding] of review.unplaced_findings.entries()) {
-    if (!['low', 'medium', 'blocking'].includes(finding.severity)) {
+    if (!FINDING_SEVERITIES.includes(finding.severity)) {
       throw new Error(`unplaced_findings[${index}].severity is invalid`);
     }
     assertString(finding.body, `unplaced_findings[${index}].body`);
@@ -219,7 +216,37 @@ function formatInlineCommentBody(comment) {
     lines.push('', `Rule source: \`${comment.rule_source}\``);
   }
 
+  // Trailing hidden marker so a later run can identify and delete this comment (see
+  // deletePreviousCodexInlineComments).
+  lines.push('', CODEX_INLINE_MARKER);
+
   return lines.join('\n');
+}
+
+// Attach `candidate` (an inline comment or a locatable unplaced finding) as an inline review comment
+// on the given diff `side` when its line is part of the diff. On success it records both the GitHub
+// comment payload and a plain-finding mirror (used to rebuild the body in the 422 fallback). Both
+// placement loops in postReview share this so the diff-mapping rules live in one place.
+function placeInlineComment({ candidate, side, patchesByPath, comments, placedFindings }) {
+  const patch = candidate.path ? patchesByPath.get(candidate.path) : undefined;
+  const lineSet = side === 'RIGHT' ? patch?.right : patch?.left;
+  if (!patch || !Number.isInteger(candidate.line) || !lineSet.has(candidate.line)) {
+    return { placed: false, patchMissing: !patch };
+  }
+
+  comments.push({
+    path: candidate.path,
+    line: candidate.line,
+    side,
+    body: formatInlineCommentBody(candidate),
+  });
+  placedFindings.push({
+    severity: candidate.severity,
+    body: candidate.body,
+    path: candidate.path,
+    line: candidate.line,
+  });
+  return { placed: true, patchMissing: false };
 }
 
 function buildReviewBody(review, unplaced, inlineCount) {
@@ -311,6 +338,47 @@ async function createIssueComment({ github, context, body, core }) {
   }
 }
 
+async function deletePreviousCodexInlineComments({ github, context, core, keepReviewId }) {
+  // Best-effort cleanup: remove inline comments left by earlier Codex runs so they do not pile up.
+  // Scoped by the hidden marker and the bot identity, and excludes the review just posted
+  // (keepReviewId). Any failure here is logged and swallowed so it can never fail a posted review.
+  let reviewComments;
+  try {
+    reviewComments = await github.paginate(github.rest.pulls.listReviewComments, {
+      owner: context.repo.owner,
+      repo: context.repo.repo,
+      pull_number: context.payload.pull_request.number,
+      per_page: 100,
+    });
+  } catch (error) {
+    core.warning(`Could not list previous review comments: ${error.message}`);
+    return;
+  }
+
+  const staleComments = reviewComments.filter(
+    (comment) =>
+      comment
+      && comment.user
+      && comment.user.login === 'github-actions[bot]'
+      && typeof comment.body === 'string'
+      && comment.body.includes(CODEX_INLINE_MARKER)
+      && comment.pull_request_review_id !== keepReviewId,
+  );
+
+  for (const comment of staleComments) {
+    try {
+      await github.rest.pulls.deleteReviewComment({
+        owner: context.repo.owner,
+        repo: context.repo.repo,
+        comment_id: comment.id,
+      });
+      core.info(`Deleted stale Codex inline comment ${comment.id}.`);
+    } catch (error) {
+      core.warning(`Could not delete stale Codex inline comment ${comment.id}: ${error.message}`);
+    }
+  }
+}
+
 async function dismissPreviousCodexReviews({ github, context, core, runUrl }) {
   let reviews;
   try {
@@ -349,12 +417,14 @@ async function dismissPreviousCodexReviews({ github, context, core, runUrl }) {
 
 module.exports = async function postReview({ github, context, core }) {
   const pr = context.payload.pull_request;
-  const safetyFailure = requiredEnv('PREFLIGHT_SAFETY_FAILURE') === 'true';
+  // These are passthrough outputs from upstream jobs and can be empty strings when a job is skipped,
+  // so allowEmpty: true treats only a genuinely unset variable as missing.
+  const safetyFailure = requiredEnv('PREFLIGHT_SAFETY_FAILURE', { allowEmpty: true }) === 'true';
   const safetyMessage = process.env.PREFLIGHT_SAFETY_MESSAGE || '';
   const skipReason = process.env.PREFLIGHT_SKIP_REASON || '';
   const skipMessage = process.env.PREFLIGHT_SKIP_MESSAGE || '';
-  const codexResult = requiredEnv('CODEX_RESULT');
-  const runUrl = requiredEnv('RUN_URL');
+  const codexResult = requiredEnv('CODEX_RESULT', { allowEmpty: true });
+  const runUrl = requiredEnv('RUN_URL', { allowEmpty: true });
 
   if (safetyFailure) {
     await createIssueComment({
@@ -388,7 +458,7 @@ module.exports = async function postReview({ github, context, core }) {
 
   let review;
   try {
-    review = readReviewOutput(requiredEnv('CODEX_OUTPUT_FILE'));
+    review = readReviewOutput(requiredEnv('CODEX_OUTPUT_FILE', { allowEmpty: true }));
     validateReview(review);
   } catch (error) {
     await createIssueComment({
@@ -438,18 +508,20 @@ module.exports = async function postReview({ github, context, core }) {
   const placedFindings = [];
 
   for (const comment of review.inline_comments) {
-    const patch = patchesByPath.get(comment.path);
-    const valid = patch
-      && (comment.side === 'RIGHT'
-        ? patch.right.has(comment.line)
-        : patch.left.has(comment.line));
+    const { placed, patchMissing } = placeInlineComment({
+      candidate: comment,
+      side: comment.side,
+      patchesByPath,
+      comments,
+      placedFindings,
+    });
 
-    if (!valid) {
+    if (!placed) {
       // Distinguish a patch-less path (listFiles truncation / binary / >~300 changed files) from a
       // line the model picked that simply is not part of the diff -- different root causes.
-      const reason = patch
-        ? `line ${comment.line} (${comment.side}) is not part of the diff`
-        : 'no patch was returned for this path (large/binary file or listFiles truncation)';
+      const reason = patchMissing
+        ? 'no patch was returned for this path (large/binary file or listFiles truncation)'
+        : `line ${comment.line} (${comment.side}) is not part of the diff`;
       core.warning(`Demoted inline comment on ${comment.path}: ${reason}.`);
       unplaced.push({
         severity: comment.severity,
@@ -457,53 +529,33 @@ module.exports = async function postReview({ github, context, core }) {
         path: comment.path,
         line: comment.line,
       });
-      continue;
     }
-
-    comments.push({
-      path: comment.path,
-      line: comment.line,
-      side: comment.side,
-      body: formatInlineCommentBody(comment),
-    });
-    placedFindings.push({
-      severity: comment.severity,
-      body: comment.body,
-      path: comment.path,
-      line: comment.line,
-    });
   }
 
   for (const finding of review.unplaced_findings) {
-    const patch = finding.path ? patchesByPath.get(finding.path) : null;
-    const valid = patch && Number.isInteger(finding.line) && patch.right.has(finding.line);
-
-    if (!valid) {
-      unplaced.push(finding);
-      continue;
-    }
-
-    comments.push({
-      path: finding.path,
-      line: finding.line,
+    // Unplaced findings only ever attach to the new side; when they cannot be located they stay in
+    // the unplaced list as-is.
+    const { placed } = placeInlineComment({
+      candidate: finding,
       side: 'RIGHT',
-      body: formatInlineCommentBody(finding),
+      patchesByPath,
+      comments,
+      placedFindings,
     });
-    placedFindings.push({
-      severity: finding.severity,
-      body: finding.body,
-      path: finding.path,
-      line: finding.line,
-    });
+
+    if (!placed) {
+      unplaced.push(finding);
+    }
   }
 
   const body = buildReviewBody(review, unplaced, comments.length);
   const event = reviewEventForSeverity(review.highest_severity);
 
-  core.info(`Codex review: placing ${comments.length} inline ${comments.length === 1 ? 'comment' : 'comments'}, ${unplaced.length} unplaced, event=${event}.`);
+  core.info(`Codex review: placing ${comments.length} inline ${pluralize(comments.length, 'comment')}, ${unplaced.length} unplaced, event=${event}.`);
 
+  let created;
   try {
-    await github.rest.pulls.createReview({
+    created = await github.rest.pulls.createReview({
       owner: context.repo.owner,
       repo: context.repo.repo,
       pull_number: pr.number,
@@ -526,11 +578,11 @@ module.exports = async function postReview({ github, context, core }) {
     // GitHub rejects the whole review with 422 if a single inline comment lands on a line it does
     // not consider commentable. Rather than lose every finding, retry once without inline comments
     // and fold them into the body as unplaced findings. A failure of this retry propagates
-    // (skipping the dismissal below), again leaving any previous review in place.
+    // (skipping the cleanup below), again leaving any previous review in place.
     if (error.status === 422 && comments.length > 0) {
       core.warning(`GitHub rejected the inline comments (422): ${error.message}. Retrying without inline comments.`);
       const fallbackBody = buildReviewBody(review, [...unplaced, ...placedFindings], 0);
-      await github.rest.pulls.createReview({
+      created = await github.rest.pulls.createReview({
         owner: context.repo.owner,
         repo: context.repo.repo,
         pull_number: pr.number,
@@ -544,9 +596,10 @@ module.exports = async function postReview({ github, context, core }) {
     }
   }
 
-  // Supersede earlier Codex reviews only after the new review has been posted. Dismissing first
-  // risked removing a previous blocking review and then failing to post the replacement, silently
-  // unblocking the PR.
+  // Clean up after the new review is safely posted. Delete inline comments left by earlier runs
+  // (keeping the one just created), then supersede earlier reviews. Dismissing first risked removing
+  // a previous blocking review and then failing to post the replacement, silently unblocking the PR.
+  await deletePreviousCodexInlineComments({ github, context, core, keepReviewId: created?.data?.id });
   await dismissPreviousCodexReviews({ github, context, core, runUrl });
 };
 
@@ -559,3 +612,4 @@ module.exports.buildReviewBody = buildReviewBody;
 module.exports.reviewEventForSeverity = reviewEventForSeverity;
 module.exports.isDismissableCodexReview = isDismissableCodexReview;
 module.exports.CODEX_REVIEW_MARKER = CODEX_REVIEW_MARKER;
+module.exports.CODEX_INLINE_MARKER = CODEX_INLINE_MARKER;
