@@ -13,11 +13,13 @@
   "properties": {
     "review_body_markdown": {
       "type": "string",
-      "minLength": 1
+      "minLength": 1,
+      "pattern": "\\S"
     },
     "diagnostics_markdown": {
       "type": "string",
-      "minLength": 1
+      "minLength": 1,
+      "pattern": "\\S"
     },
     "highest_severity": {
       "type": "string",
@@ -51,7 +53,8 @@
         "properties": {
           "path": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "pattern": "\\S"
           },
           "line": {
             "type": "integer",
@@ -67,7 +70,8 @@
           },
           "body": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "pattern": "\\S"
           },
           "rule_source": {
             "type": ["string", "null"]
@@ -80,7 +84,8 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["severity", "body", "path", "line"],
+        "comment": "path and line are optional: unplaced findings are precisely those that do not map to a diff line. This matches validateReview in post-review.js, which accepts them absent or null.",
+        "required": ["severity", "body"],
         "properties": {
           "severity": {
             "type": "string",
@@ -88,7 +93,8 @@
           },
           "body": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "pattern": "\\S"
           },
           "path": {
             "type": ["string", "null"]
