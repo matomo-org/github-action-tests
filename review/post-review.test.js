@@ -13,6 +13,7 @@ const path = require('node:path');
 const postReview = require('./post-review.js');
 const {
   parsePatchLines,
+  resolveReviewOutputPath,
   validateReview,
   expectedHighestSeverity,
   countFindingsBySeverity,
@@ -21,6 +22,7 @@ const {
   isDismissableCodexReview,
   CODEX_REVIEW_MARKER,
   CODEX_INLINE_MARKER,
+  CODEX_REVIEW_OUTPUT_FILE,
   REVIEW_LIMITS,
 } = postReview;
 
@@ -455,7 +457,7 @@ function setEnv(t, vars) {
 
 function writeTempReview(t, content) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'codex-review-test-'));
-  const file = path.join(dir, 'codex-review-output.json');
+  const file = path.join(dir, CODEX_REVIEW_OUTPUT_FILE);
   fs.writeFileSync(file, content);
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   return file;
@@ -472,6 +474,33 @@ function reviewJson(overrides = {}) {
     ...overrides,
   });
 }
+
+test('resolveReviewOutputPath: only accepts the expected output file inside the output directory', (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'codex-review-test-'));
+  const expectedFile = path.join(dir, CODEX_REVIEW_OUTPUT_FILE);
+  fs.writeFileSync(expectedFile, reviewJson());
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+
+  assert.equal(resolveReviewOutputPath(dir), fs.realpathSync(expectedFile));
+});
+
+test('resolveReviewOutputPath: rejects output files that resolve outside the output directory', (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'codex-review-test-'));
+  const outsideDir = fs.mkdtempSync(path.join(os.tmpdir(), 'codex-review-outside-'));
+  const outsideFile = path.join(outsideDir, CODEX_REVIEW_OUTPUT_FILE);
+  const linkedFile = path.join(dir, CODEX_REVIEW_OUTPUT_FILE);
+  fs.writeFileSync(outsideFile, reviewJson());
+  fs.symlinkSync(outsideFile, linkedFile);
+  t.after(() => {
+    fs.rmSync(dir, { recursive: true, force: true });
+    fs.rmSync(outsideDir, { recursive: true, force: true });
+  });
+
+  assert.throws(
+    () => resolveReviewOutputPath(dir),
+    /must resolve inside CODEX_OUTPUT_DIR/,
+  );
+});
 
 test('postReview: posts a comment and no review on a preflight safety failure', async (t) => {
   setEnv(t, {
@@ -523,7 +552,7 @@ test('postReview: reports invalid structured output and fails the step', async (
     PREFLIGHT_SKIP_REASON: '',
     CODEX_RESULT: 'success',
     RUN_URL: 'https://example/run',
-    CODEX_OUTPUT_FILE: file,
+    CODEX_OUTPUT_DIR: path.dirname(file),
   });
   const { github, calls } = fakeGithub();
   const core = fakeCore();
@@ -545,7 +574,7 @@ test('postReview: places an inline comment that maps to a changed diff line', as
     PREFLIGHT_SKIP_REASON: '',
     CODEX_RESULT: 'success',
     RUN_URL: 'https://example/run',
-    CODEX_OUTPUT_FILE: file,
+    CODEX_OUTPUT_DIR: path.dirname(file),
   });
   const { github, calls } = fakeGithub({ files: [{ filename: 'a.js', patch }] });
   await postReview({ github, context: fakeContext(), core: fakeCore() });
@@ -574,7 +603,7 @@ test('postReview: demotes an inline comment whose line is not part of the diff',
     PREFLIGHT_SKIP_REASON: '',
     CODEX_RESULT: 'success',
     RUN_URL: 'https://example/run',
-    CODEX_OUTPUT_FILE: file,
+    CODEX_OUTPUT_DIR: path.dirname(file),
   });
   const { github, calls } = fakeGithub({ files: [{ filename: 'a.js', patch }] });
   const core = fakeCore();
@@ -598,7 +627,7 @@ test('postReview: retries without inline comments when GitHub rejects them with 
     PREFLIGHT_SKIP_REASON: '',
     CODEX_RESULT: 'success',
     RUN_URL: 'https://example/run',
-    CODEX_OUTPUT_FILE: file,
+    CODEX_OUTPUT_DIR: path.dirname(file),
   });
   const rejection = Object.assign(new Error('unprocessable entity'), { status: 422 });
   const { github, calls } = fakeGithub({
@@ -629,7 +658,7 @@ test('postReview: dismisses a previous blocking Codex review after posting the n
     PREFLIGHT_SKIP_REASON: '',
     CODEX_RESULT: 'success',
     RUN_URL: 'https://example/run',
-    CODEX_OUTPUT_FILE: file,
+    CODEX_OUTPUT_DIR: path.dirname(file),
   });
   const { github, calls } = fakeGithub({ files: [], reviews: [previous] });
   await postReview({ github, context: fakeContext(), core: fakeCore() });
@@ -656,7 +685,7 @@ test('postReview: does not dismiss previous reviews when creating the new review
     PREFLIGHT_SKIP_REASON: '',
     CODEX_RESULT: 'success',
     RUN_URL: 'https://example/run',
-    CODEX_OUTPUT_FILE: file,
+    CODEX_OUTPUT_DIR: path.dirname(file),
   });
   // A non-403/422 error is not recoverable and must propagate, but the previous blocking review
   // must be left in place so the PR is not silently unblocked.
@@ -680,7 +709,7 @@ test('postReview: requests changes when a blocking inline comment is present des
     PREFLIGHT_SKIP_REASON: '',
     CODEX_RESULT: 'success',
     RUN_URL: 'https://example/run',
-    CODEX_OUTPUT_FILE: file,
+    CODEX_OUTPUT_DIR: path.dirname(file),
   });
   const { github, calls } = fakeGithub({ files: [{ filename: 'a.js', patch }] });
   await postReview({ github, context: fakeContext(), core: fakeCore() });
@@ -696,7 +725,7 @@ test('postReview: posts a comment instead of crashing when listing PR files fail
     PREFLIGHT_SKIP_REASON: '',
     CODEX_RESULT: 'success',
     RUN_URL: 'https://example/run/77',
-    CODEX_OUTPUT_FILE: file,
+    CODEX_OUTPUT_DIR: path.dirname(file),
   });
   const listFilesError = Object.assign(new Error('boom'), { status: 500 });
   const { github, calls } = fakeGithub({ listFilesError });
@@ -722,7 +751,7 @@ test('postReview: degrades to a plain comment when the token cannot submit a rev
     PREFLIGHT_SKIP_REASON: '',
     CODEX_RESULT: 'success',
     RUN_URL: 'https://example/run',
-    CODEX_OUTPUT_FILE: file,
+    CODEX_OUTPUT_DIR: path.dirname(file),
   });
   const forbidden = Object.assign(new Error('forbidden'), { status: 403 });
   const { github, calls } = fakeGithub({ files: [], reviews: [previous], createReviewErrors: [forbidden] });
@@ -746,7 +775,7 @@ test('postReview: promotes a locatable unplaced finding to an inline comment', a
     PREFLIGHT_SKIP_REASON: '',
     CODEX_RESULT: 'success',
     RUN_URL: 'https://example/run',
-    CODEX_OUTPUT_FILE: file,
+    CODEX_OUTPUT_DIR: path.dirname(file),
   });
   const { github, calls } = fakeGithub({ files: [{ filename: 'a.js', patch }] });
   await postReview({ github, context: fakeContext(), core: fakeCore() });
@@ -775,7 +804,7 @@ test('postReview: still posts the new review when dismissing a previous review f
     PREFLIGHT_SKIP_REASON: '',
     CODEX_RESULT: 'success',
     RUN_URL: 'https://example/run',
-    CODEX_OUTPUT_FILE: file,
+    CODEX_OUTPUT_DIR: path.dirname(file),
   });
   const forbidden = Object.assign(new Error('cannot dismiss'), { status: 403 });
   const { github, calls } = fakeGithub({ files: [], reviews: [previous], dismissReviewErrors: [forbidden] });
@@ -794,7 +823,7 @@ test('postReview: still posts the new review when listing previous reviews fails
     PREFLIGHT_SKIP_REASON: '',
     CODEX_RESULT: 'success',
     RUN_URL: 'https://example/run',
-    CODEX_OUTPUT_FILE: file,
+    CODEX_OUTPUT_DIR: path.dirname(file),
   });
   const listReviewsError = Object.assign(new Error('list failed'), { status: 500 });
   const { github, calls } = fakeGithub({ files: [], listReviewsError });
@@ -834,7 +863,7 @@ test('postReview: deletes stale Codex inline comments from previous runs but kee
     PREFLIGHT_SKIP_REASON: '',
     CODEX_RESULT: 'success',
     RUN_URL: 'https://example/run',
-    CODEX_OUTPUT_FILE: file,
+    CODEX_OUTPUT_DIR: path.dirname(file),
   });
   const { github, calls } = fakeGithub({
     files: [],

@@ -427,7 +427,7 @@ jobs:
       - name: Post review result
         uses: actions/github-script@373c709c69115d41ff229c7e5df9f8788daa9553
         env:
-          CODEX_OUTPUT_FILE: ${{ runner.temp }}/codex-review/codex-review-output.json
+          CODEX_OUTPUT_DIR: ${{ runner.temp }}/codex-review
           CODEX_RESULT: ${{ needs.codex.result }}
           PREFLIGHT_RESULT: ${{ needs.preflight.result }}
           PREFLIGHT_SAFETY_FAILURE: ${{ needs.preflight.outputs.safety_failure }}

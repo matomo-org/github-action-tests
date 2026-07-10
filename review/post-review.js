@@ -1,4 +1,5 @@
 const fs = require('fs');
+const path = require('path');
 const { requiredEnv } = require('./env-utils');
 
 // Severity ranked low->high; index doubles as the ordering used to reconcile highest_severity.
@@ -25,6 +26,7 @@ const CODEX_REVIEW_MARKER = 'This Codex review supersedes any previous Codex rev
 // remove its inline comments, so each run finds and deletes prior Codex inline comments by this
 // marker to stop them accumulating across runs.
 const CODEX_INLINE_MARKER = '<!-- codex-review-inline -->';
+const CODEX_REVIEW_OUTPUT_FILE = 'codex-review-output.json';
 
 function expectedHighestSeverity(findings) {
   if (findings.blocking > 0) {
@@ -167,8 +169,25 @@ function validateReview(review) {
   review.highest_severity = expectedHighestSeverity(review.findings);
 }
 
-function readReviewOutput(path) {
-  const raw = fs.readFileSync(path, 'utf8').trim();
+function resolveReviewOutputPath(outputDir) {
+  assertString(outputDir, 'CODEX_OUTPUT_DIR');
+
+  const resolvedDir = path.resolve(outputDir);
+  const resolvedOutputPath = path.resolve(resolvedDir, CODEX_REVIEW_OUTPUT_FILE);
+  const realDir = fs.realpathSync(resolvedDir);
+  const realOutputPath = fs.realpathSync(resolvedOutputPath);
+  const relativeOutputPath = path.relative(realDir, realOutputPath);
+
+  if (relativeOutputPath !== CODEX_REVIEW_OUTPUT_FILE) {
+    throw new Error('Codex output file must resolve inside CODEX_OUTPUT_DIR');
+  }
+
+  return realOutputPath;
+}
+
+function readReviewOutput(outputDir) {
+  const reviewOutputPath = resolveReviewOutputPath(outputDir);
+  const raw = fs.readFileSync(reviewOutputPath, 'utf8').trim();
   if (!raw) {
     throw new Error('Codex output file is empty');
   }
@@ -504,7 +523,7 @@ module.exports = async function postReview({ github, context, core }) {
 
   let review;
   try {
-    review = readReviewOutput(requiredEnv('CODEX_OUTPUT_FILE', { allowEmpty: true }));
+    review = readReviewOutput(requiredEnv('CODEX_OUTPUT_DIR'));
     validateReview(review);
   } catch (error) {
     await createIssueComment({
@@ -652,6 +671,7 @@ module.exports = async function postReview({ github, context, core }) {
 // Exported for unit testing. The workflow only calls the default postReview export; these named
 // helpers are attached so their logic can be exercised in isolation (see post-review.test.js).
 module.exports.parsePatchLines = parsePatchLines;
+module.exports.resolveReviewOutputPath = resolveReviewOutputPath;
 module.exports.validateReview = validateReview;
 module.exports.expectedHighestSeverity = expectedHighestSeverity;
 module.exports.countFindingsBySeverity = countFindingsBySeverity;
@@ -660,4 +680,5 @@ module.exports.reviewEventForSeverity = reviewEventForSeverity;
 module.exports.isDismissableCodexReview = isDismissableCodexReview;
 module.exports.CODEX_REVIEW_MARKER = CODEX_REVIEW_MARKER;
 module.exports.CODEX_INLINE_MARKER = CODEX_INLINE_MARKER;
+module.exports.CODEX_REVIEW_OUTPUT_FILE = CODEX_REVIEW_OUTPUT_FILE;
 module.exports.REVIEW_LIMITS = REVIEW_LIMITS;
