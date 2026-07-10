@@ -15,11 +15,13 @@ const {
   parsePatchLines,
   validateReview,
   expectedHighestSeverity,
+  countFindingsBySeverity,
   buildReviewBody,
   reviewEventForSeverity,
   isDismissableCodexReview,
   CODEX_REVIEW_MARKER,
   CODEX_INLINE_MARKER,
+  REVIEW_LIMITS,
 } = postReview;
 
 // --- parsePatchLines --------------------------------------------------------
@@ -112,24 +114,26 @@ test('validateReview: accepts a minimal valid review', () => {
   assert.doesNotThrow(() => validateReview(validReview()));
 });
 
-test('validateReview: recomputes highest_severity from the finding counts', () => {
-  const cases = [
-    [{ blocking: 1, medium: 3, low_polish: 5 }, 'blocking'],
-    [{ blocking: 0, medium: 2, low_polish: 5 }, 'medium'],
-    [{ blocking: 0, medium: 0, low_polish: 4 }, 'low'],
-    [{ blocking: 0, medium: 0, low_polish: 0 }, 'none'],
-  ];
-  for (const [findings, expected] of cases) {
-    // Seed a deliberately wrong highest_severity to prove it is overwritten from the counts.
-    const review = validReview({ findings, highest_severity: 'low' });
-    validateReview(review);
-    assert.equal(review.highest_severity, expected);
-  }
+test('validateReview: recomputes findings and highest_severity from structured findings', () => {
+  const review = validReview({
+    findings: { blocking: 0, medium: 0, low_polish: 0 },
+    highest_severity: 'none',
+    inline_comments: [
+      { path: 'a.js', line: 1, side: 'RIGHT', severity: 'medium', body: 'b', rule_source: null },
+      { path: 'b.js', line: 2, side: 'RIGHT', severity: 'low', body: 'b', rule_source: null },
+    ],
+    unplaced_findings: [
+      { severity: 'blocking', body: 'b', path: null, line: null },
+    ],
+  });
+  validateReview(review);
+  assert.deepEqual(review.findings, { blocking: 1, medium: 1, low_polish: 1 });
+  assert.equal(review.highest_severity, 'blocking');
 });
 
-test('validateReview: raises highest_severity to the severest inline/unplaced finding', () => {
-  // Counts claim no findings, but a blocking inline comment is present: the review must be treated
-  // as blocking so it is posted as REQUEST_CHANGES rather than a "no findings" COMMENT.
+test('validateReview: ignores inconsistent model-provided finding counts', () => {
+  // Counts claim no findings, but a blocking inline comment is present: the normalized review must
+  // be treated as blocking so it is posted as REQUEST_CHANGES with a truthful overview table.
   const blockingComment = validReview({
     findings: { blocking: 0, medium: 0, low_polish: 0 },
     highest_severity: 'none',
@@ -138,6 +142,7 @@ test('validateReview: raises highest_severity to the severest inline/unplaced fi
     ],
   });
   validateReview(blockingComment);
+  assert.deepEqual(blockingComment.findings, { blocking: 1, medium: 0, low_polish: 0 });
   assert.equal(blockingComment.highest_severity, 'blocking');
 
   // Likewise an unplaced medium finding outranks all-zero counts.
@@ -147,18 +152,20 @@ test('validateReview: raises highest_severity to the severest inline/unplaced fi
     unplaced_findings: [{ severity: 'medium', body: 'b', path: null, line: null }],
   });
   validateReview(mediumUnplaced);
+  assert.deepEqual(mediumUnplaced.findings, { blocking: 0, medium: 1, low_polish: 0 });
   assert.equal(mediumUnplaced.highest_severity, 'medium');
 
-  // The count-based severity still wins when it is higher than any individual comment.
-  const countsWin = validReview({
+  // A stale blocking count must not turn a lower-severity structured finding into a blocking review.
+  const structuredFindingsWin = validReview({
     findings: { blocking: 1, medium: 0, low_polish: 0 },
     highest_severity: 'none',
     inline_comments: [
       { path: 'a.js', line: 1, side: 'RIGHT', severity: 'low', body: 'b', rule_source: null },
     ],
   });
-  validateReview(countsWin);
-  assert.equal(countsWin.highest_severity, 'blocking');
+  validateReview(structuredFindingsWin);
+  assert.deepEqual(structuredFindingsWin.findings, { blocking: 0, medium: 0, low_polish: 1 });
+  assert.equal(structuredFindingsWin.highest_severity, 'low');
 });
 
 test('validateReview: accepts unplaced findings with path and line omitted entirely', () => {
@@ -181,6 +188,42 @@ test('validateReview: rejects missing or empty required string fields', () => {
   assert.throws(() => validateReview(validReview({ review_body_markdown: '' })));
   assert.throws(() => validateReview(validReview({ review_body_markdown: '   ' })));
   assert.throws(() => validateReview(validReview({ diagnostics_markdown: '' })));
+});
+
+test('validateReview: rejects over-limit strings and finding collections', () => {
+  const inlineComment = { path: 'a.js', line: 1, side: 'RIGHT', severity: 'low', body: 'b', rule_source: null };
+  const unplacedFinding = { severity: 'low', body: 'b', path: null, line: null };
+
+  assert.throws(() => validateReview(validReview({
+    review_body_markdown: 'x'.repeat(REVIEW_LIMITS.reviewBodyMarkdownMaxLength + 1),
+  })), /review_body_markdown must be at most/);
+  assert.throws(() => validateReview(validReview({
+    diagnostics_markdown: 'x'.repeat(REVIEW_LIMITS.diagnosticsMarkdownMaxLength + 1),
+  })), /diagnostics_markdown must be at most/);
+  assert.throws(() => validateReview(validReview({
+    findings: { blocking: REVIEW_LIMITS.inlineCommentsMaxItems + REVIEW_LIMITS.unplacedFindingsMaxItems + 1, medium: 0, low_polish: 0 },
+  })), /findings\.blocking must be at most/);
+  assert.throws(() => validateReview(validReview({
+    inline_comments: Array.from({ length: REVIEW_LIMITS.inlineCommentsMaxItems + 1 }, () => inlineComment),
+  })), /inline_comments must contain at most/);
+  assert.throws(() => validateReview(validReview({
+    unplaced_findings: Array.from({ length: REVIEW_LIMITS.unplacedFindingsMaxItems + 1 }, () => unplacedFinding),
+  })), /unplaced_findings must contain at most/);
+  assert.throws(() => validateReview(validReview({
+    inline_comments: [{ ...inlineComment, path: 'x'.repeat(REVIEW_LIMITS.pathMaxLength + 1) }],
+  })), /path must be at most/);
+  assert.throws(() => validateReview(validReview({
+    inline_comments: [{ ...inlineComment, body: 'x'.repeat(REVIEW_LIMITS.findingBodyMaxLength + 1) }],
+  })), /body must be at most/);
+  assert.throws(() => validateReview(validReview({
+    inline_comments: [{ ...inlineComment, rule_source: 'x'.repeat(REVIEW_LIMITS.ruleSourceMaxLength + 1) }],
+  })), /rule_source must be at most/);
+  assert.throws(() => validateReview(validReview({
+    unplaced_findings: [{ ...unplacedFinding, path: 'x'.repeat(REVIEW_LIMITS.pathMaxLength + 1) }],
+  })), /path must be at most/);
+  assert.throws(() => validateReview(validReview({
+    unplaced_findings: [{ ...unplacedFinding, body: 'x'.repeat(REVIEW_LIMITS.findingBodyMaxLength + 1) }],
+  })), /body must be at most/);
 });
 
 test('validateReview: rejects an invalid highest_severity enum before recompute', () => {
@@ -237,6 +280,21 @@ test('expectedHighestSeverity: maps counts to the highest present severity', () 
   assert.equal(expectedHighestSeverity({ blocking: 0, medium: 1, low_polish: 1 }), 'medium');
   assert.equal(expectedHighestSeverity({ blocking: 0, medium: 0, low_polish: 1 }), 'low');
   assert.equal(expectedHighestSeverity({ blocking: 0, medium: 0, low_polish: 0 }), 'none');
+});
+
+test('countFindingsBySeverity: counts inline and unplaced finding severities', () => {
+  const inlineComments = [
+    { severity: 'blocking' },
+    { severity: 'low' },
+  ];
+  const unplacedFindings = [
+    { severity: 'medium' },
+    { severity: 'low' },
+  ];
+  assert.deepEqual(
+    countFindingsBySeverity(inlineComments, unplacedFindings),
+    { blocking: 1, medium: 1, low_polish: 2 },
+  );
 });
 
 // --- reviewEventForSeverity (security invariant: never APPROVE) --------------
@@ -803,4 +861,45 @@ test('CODEX_REVIEW_MARKER stays byte-identical in the preflight workflow', () =>
     workflow.includes(CODEX_REVIEW_MARKER),
     'codex-review.yml no longer contains the exact CODEX_REVIEW_MARKER literal from post-review.js',
   );
+});
+
+test('review-output schema stays aligned with the post-review validator limits', () => {
+  const schema = JSON.parse(fs.readFileSync(
+    path.join(__dirname, 'review-output.schema.json'),
+    'utf8',
+  ));
+  const maxFindings = REVIEW_LIMITS.inlineCommentsMaxItems + REVIEW_LIMITS.unplacedFindingsMaxItems;
+
+  assert.equal(schema.properties.review_body_markdown.maxLength, REVIEW_LIMITS.reviewBodyMarkdownMaxLength);
+  assert.equal(schema.properties.diagnostics_markdown.maxLength, REVIEW_LIMITS.diagnosticsMarkdownMaxLength);
+  assert.equal(schema.properties.findings.properties.blocking.maximum, maxFindings);
+  assert.equal(schema.properties.findings.properties.medium.maximum, maxFindings);
+  assert.equal(schema.properties.findings.properties.low_polish.maximum, maxFindings);
+  assert.equal(schema.properties.inline_comments.maxItems, REVIEW_LIMITS.inlineCommentsMaxItems);
+  assert.equal(schema.properties.inline_comments.items.properties.path.maxLength, REVIEW_LIMITS.pathMaxLength);
+  assert.equal(schema.properties.inline_comments.items.properties.body.maxLength, REVIEW_LIMITS.findingBodyMaxLength);
+  assert.equal(schema.properties.inline_comments.items.properties.rule_source.maxLength, REVIEW_LIMITS.ruleSourceMaxLength);
+  assert.equal(schema.properties.unplaced_findings.maxItems, REVIEW_LIMITS.unplacedFindingsMaxItems);
+  assert.equal(schema.properties.unplaced_findings.items.properties.path.maxLength, REVIEW_LIMITS.pathMaxLength);
+  assert.equal(schema.properties.unplaced_findings.items.properties.body.maxLength, REVIEW_LIMITS.findingBodyMaxLength);
+});
+
+test('workflow action references stay pinned to full commit SHAs', () => {
+  for (const workflowFile of ['codex-review.yml', 'test-review-scripts.yml']) {
+    const workflow = fs.readFileSync(
+      path.join(__dirname, '..', '.github', 'workflows', workflowFile),
+      'utf8',
+    );
+    for (const match of workflow.matchAll(/uses:\s+([^\s]+)/g)) {
+      const actionRef = match[1];
+      if (actionRef.includes('/.github/workflows/')) {
+        continue;
+      }
+      assert.match(
+        actionRef,
+        /@[0-9a-f]{40}$/,
+        `${workflowFile} contains an unpinned action reference: ${actionRef}`,
+      );
+    }
+  }
 });

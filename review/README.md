@@ -113,6 +113,8 @@ address.
   shared workflow repository at `job.workflow_sha` (the pinned trusted commit),
   never from the caller/PR. A PR that edits `review/*` cannot change what
   actually executes.
+- External GitHub Actions used by the trusted workflow are pinned by full commit
+  SHA so tag retargeting cannot silently change what privileged jobs execute.
 - The PR is checked out into a separate `pr/` directory that is only ever the
   *target* of read-only inspection — it is not a source of executable workflow
   logic.

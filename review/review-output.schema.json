@@ -14,11 +14,13 @@
     "review_body_markdown": {
       "type": "string",
       "minLength": 1,
+      "maxLength": 2000,
       "pattern": "\\S"
     },
     "diagnostics_markdown": {
       "type": "string",
       "minLength": 1,
+      "maxLength": 60000,
       "pattern": "\\S"
     },
     "highest_severity": {
@@ -32,20 +34,24 @@
       "properties": {
         "blocking": {
           "type": "integer",
-          "minimum": 0
+          "minimum": 0,
+          "maximum": 40
         },
         "medium": {
           "type": "integer",
-          "minimum": 0
+          "minimum": 0,
+          "maximum": 40
         },
         "low_polish": {
           "type": "integer",
-          "minimum": 0
+          "minimum": 0,
+          "maximum": 40
         }
       }
     },
     "inline_comments": {
       "type": "array",
+      "maxItems": 20,
       "items": {
         "type": "object",
         "additionalProperties": false,
@@ -54,6 +60,7 @@
           "path": {
             "type": "string",
             "minLength": 1,
+            "maxLength": 1024,
             "pattern": "\\S"
           },
           "line": {
@@ -71,16 +78,19 @@
           "body": {
             "type": "string",
             "minLength": 1,
+            "maxLength": 1200,
             "pattern": "\\S"
           },
           "rule_source": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "maxLength": 128
           }
         }
       }
     },
     "unplaced_findings": {
       "type": "array",
+      "maxItems": 20,
       "items": {
         "type": "object",
         "additionalProperties": false,
@@ -94,10 +104,12 @@
           "body": {
             "type": "string",
             "minLength": 1,
+            "maxLength": 1200,
             "pattern": "\\S"
           },
           "path": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "maxLength": 1024
           },
           "line": {
             "type": ["integer", "null"],

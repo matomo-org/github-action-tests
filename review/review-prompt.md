@@ -38,6 +38,8 @@ Validation policy:
 
 Output policy:
 - Produce JSON matching the provided schema exactly.
+- Stay within the schema's size limits: concise summary, bounded diagnostics, at most 20 inline
+  comments, at most 20 unplaced findings, and short finding bodies.
 - Write for two audiences:
   - `review_body_markdown` is only a short public summary for developers. Keep it to one or two concise paragraphs. Do not include the full Matomo review template, command lists, or detailed process notes here.
   - `diagnostics_markdown` is the detailed audit trail. It must preserve the Matomo review structure from `$matomo-review`: `Findings`, `Problem Addressed`, `Overall Assessment`, `Matomo-Specific Checks`, `Debt Check`, and `Next Steps`.

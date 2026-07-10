@@ -85,7 +85,7 @@ jobs:
     steps:
       - name: Check changed files
         id: preflight
-        uses: actions/github-script@v9
+        uses: actions/github-script@373c709c69115d41ff229c7e5df9f8788daa9553
         env:
           ALLOWED_OWNERS: ${{ inputs.allowed-owners }}
           AUTOMATION_PATHS: ${{ inputs.automation-paths }}
@@ -214,7 +214,7 @@ jobs:
           fi
 
       - name: Checkout trusted workflow assets
-        uses: actions/checkout@v7
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
           repository: ${{ job.workflow_repository }}
           ref: ${{ job.workflow_sha }}
@@ -222,7 +222,7 @@ jobs:
           persist-credentials: false
 
       - name: Checkout PR
-        uses: actions/checkout@v7
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
           ref: refs/pull/${{ github.event.pull_request.number }}/merge
           path: pr
@@ -249,7 +249,7 @@ jobs:
             "+refs/pull/$PR_NUMBER/head"
 
       - name: Checkout Matomo core context
-        uses: actions/checkout@v7
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
           repository: ${{ inputs.matomo-core-repository }}
           ref: ${{ inputs.matomo-core-ref }}
@@ -318,7 +318,7 @@ jobs:
           echo "context_file=$context_file" >> "$GITHUB_OUTPUT"
 
       - name: Checkout Matomo skills
-        uses: actions/checkout@v7
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
           repository: matomo-org/matomo-agent-skills
           ref: ${{ inputs.matomo-agent-skills-ref }}
@@ -389,7 +389,7 @@ jobs:
 
       - name: Upload Codex diagnostics
         if: ${{ always() }}
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: codex-review-output
           path: |
@@ -410,7 +410,7 @@ jobs:
       pull-requests: write
     steps:
       - name: Checkout trusted workflow assets
-        uses: actions/checkout@v7
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
           repository: ${{ job.workflow_repository }}
           ref: ${{ job.workflow_sha }}
@@ -419,13 +419,13 @@ jobs:
 
       - name: Download Codex diagnostics
         if: ${{ needs.codex.result == 'success' }}
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: codex-review-output
           path: ${{ runner.temp }}/codex-review
 
       - name: Post review result
-        uses: actions/github-script@v9
+        uses: actions/github-script@373c709c69115d41ff229c7e5df9f8788daa9553
         env:
           CODEX_OUTPUT_FILE: ${{ runner.temp }}/codex-review/codex-review-output.json
           CODEX_RESULT: ${{ needs.codex.result }}
@@ -449,7 +449,7 @@ jobs:
       pull-requests: write
     steps:
       - name: Remove trigger label
-        uses: actions/github-script@v9
+        uses: actions/github-script@373c709c69115d41ff229c7e5df9f8788daa9553
         env:
           TRIGGER_LABEL: ${{ inputs.trigger-label }}
         with:

@@ -6,6 +6,16 @@ const SEVERITIES = ['none', 'low', 'medium', 'blocking'];
 // The subset a finding/comment may carry ('none' is a review-level state, not a per-finding value).
 const FINDING_SEVERITIES = SEVERITIES.filter((severity) => severity !== 'none');
 
+const REVIEW_LIMITS = Object.freeze({
+  reviewBodyMarkdownMaxLength: 2000,
+  diagnosticsMarkdownMaxLength: 60000,
+  inlineCommentsMaxItems: 20,
+  unplacedFindingsMaxItems: 20,
+  pathMaxLength: 1024,
+  findingBodyMaxLength: 1200,
+  ruleSourceMaxLength: 128,
+});
+
 // Sentinel embedded in every Codex review body so later runs can recognise and supersede their own
 // previous reviews. The preflight job in .github/workflows/codex-review.yml matches this exact
 // string to deduplicate runs, so it MUST stay byte-identical to the literal there.
@@ -29,16 +39,45 @@ function expectedHighestSeverity(findings) {
   return 'none';
 }
 
-function assertString(value, name) {
+function assertString(value, name, { maxLength } = {}) {
   if (typeof value !== 'string' || value.trim() === '') {
     throw new Error(`${name} must be a non-empty string`);
   }
+  if (maxLength !== undefined && value.length > maxLength) {
+    throw new Error(`${name} must be at most ${maxLength} characters`);
+  }
 }
 
-function assertInteger(value, name) {
+function assertInteger(value, name, { max } = {}) {
   if (!Number.isInteger(value) || value < 0) {
     throw new Error(`${name} must be a non-negative integer`);
   }
+  if (max !== undefined && value > max) {
+    throw new Error(`${name} must be at most ${max}`);
+  }
+}
+
+function assertArray(value, name, { maxItems } = {}) {
+  if (!Array.isArray(value)) {
+    throw new Error(`${name} must be an array`);
+  }
+  if (maxItems !== undefined && value.length > maxItems) {
+    throw new Error(`${name} must contain at most ${maxItems} items`);
+  }
+}
+
+function countFindingsBySeverity(inlineComments, unplacedFindings) {
+  const findings = { blocking: 0, medium: 0, low_polish: 0 };
+  for (const finding of [...inlineComments, ...unplacedFindings]) {
+    if (finding.severity === 'blocking') {
+      findings.blocking += 1;
+    } else if (finding.severity === 'medium') {
+      findings.medium += 1;
+    } else if (finding.severity === 'low') {
+      findings.low_polish += 1;
+    }
+  }
+  return findings;
 }
 
 // Defence-in-depth re-validation of the Codex output. The codex-action already constrains the model
@@ -49,10 +88,14 @@ function validateReview(review) {
     throw new Error('Codex output must be a JSON object');
   }
 
-  assertString(review.review_body_markdown, 'review_body_markdown');
+  assertString(review.review_body_markdown, 'review_body_markdown', {
+    maxLength: REVIEW_LIMITS.reviewBodyMarkdownMaxLength,
+  });
   // diagnostics_markdown is intentionally not rendered into the review body; it is surfaced only via
   // the uploaded codex-review-output artifact, so the PR conversation stays concise.
-  assertString(review.diagnostics_markdown, 'diagnostics_markdown');
+  assertString(review.diagnostics_markdown, 'diagnostics_markdown', {
+    maxLength: REVIEW_LIMITS.diagnosticsMarkdownMaxLength,
+  });
   if (!SEVERITIES.includes(review.highest_severity)) {
     throw new Error('highest_severity is invalid');
   }
@@ -61,19 +104,22 @@ function validateReview(review) {
   if (!findings || typeof findings !== 'object' || Array.isArray(findings)) {
     throw new Error('findings must be an object');
   }
-  assertInteger(findings.blocking, 'findings.blocking');
-  assertInteger(findings.medium, 'findings.medium');
-  assertInteger(findings.low_polish, 'findings.low_polish');
+  const maxFindings = REVIEW_LIMITS.inlineCommentsMaxItems + REVIEW_LIMITS.unplacedFindingsMaxItems;
+  assertInteger(findings.blocking, 'findings.blocking', { max: maxFindings });
+  assertInteger(findings.medium, 'findings.medium', { max: maxFindings });
+  assertInteger(findings.low_polish, 'findings.low_polish', { max: maxFindings });
 
-  if (!Array.isArray(review.inline_comments)) {
-    throw new Error('inline_comments must be an array');
-  }
-  if (!Array.isArray(review.unplaced_findings)) {
-    throw new Error('unplaced_findings must be an array');
-  }
+  assertArray(review.inline_comments, 'inline_comments', {
+    maxItems: REVIEW_LIMITS.inlineCommentsMaxItems,
+  });
+  assertArray(review.unplaced_findings, 'unplaced_findings', {
+    maxItems: REVIEW_LIMITS.unplacedFindingsMaxItems,
+  });
 
   for (const [index, comment] of review.inline_comments.entries()) {
-    assertString(comment.path, `inline_comments[${index}].path`);
+    assertString(comment.path, `inline_comments[${index}].path`, {
+      maxLength: REVIEW_LIMITS.pathMaxLength,
+    });
     if (!Number.isInteger(comment.line) || comment.line < 1) {
       throw new Error(`inline_comments[${index}].line must be a positive integer`);
     }
@@ -83,10 +129,15 @@ function validateReview(review) {
     if (!FINDING_SEVERITIES.includes(comment.severity)) {
       throw new Error(`inline_comments[${index}].severity is invalid`);
     }
-    assertString(comment.body, `inline_comments[${index}].body`);
+    assertString(comment.body, `inline_comments[${index}].body`, {
+      maxLength: REVIEW_LIMITS.findingBodyMaxLength,
+    });
     // rule_source is required by the schema but may be null; it is only read optionally downstream.
     if (comment.rule_source !== null && typeof comment.rule_source !== 'string') {
       throw new Error(`inline_comments[${index}].rule_source must be a string or null`);
+    }
+    if (typeof comment.rule_source === 'string' && comment.rule_source.length > REVIEW_LIMITS.ruleSourceMaxLength) {
+      throw new Error(`inline_comments[${index}].rule_source must be at most ${REVIEW_LIMITS.ruleSourceMaxLength} characters`);
     }
   }
 
@@ -94,10 +145,15 @@ function validateReview(review) {
     if (!FINDING_SEVERITIES.includes(finding.severity)) {
       throw new Error(`unplaced_findings[${index}].severity is invalid`);
     }
-    assertString(finding.body, `unplaced_findings[${index}].body`);
+    assertString(finding.body, `unplaced_findings[${index}].body`, {
+      maxLength: REVIEW_LIMITS.findingBodyMaxLength,
+    });
     // path and line are nullable per the schema; the mapping step re-derives placement from them.
     if (finding.path !== null && finding.path !== undefined && typeof finding.path !== 'string') {
       throw new Error(`unplaced_findings[${index}].path must be a string or null`);
+    }
+    if (typeof finding.path === 'string' && finding.path.length > REVIEW_LIMITS.pathMaxLength) {
+      throw new Error(`unplaced_findings[${index}].path must be at most ${REVIEW_LIMITS.pathMaxLength} characters`);
     }
     if (finding.line !== null && finding.line !== undefined
       && (!Number.isInteger(finding.line) || finding.line < 1)) {
@@ -105,20 +161,10 @@ function validateReview(review) {
     }
   }
 
-  // Recompute highest_severity from trustworthy signals rather than trusting the model's own value.
-  // The counts drive the baseline, but an individual inline/unplaced finding may carry a higher
-  // severity than the counts imply; in that case the review must reflect the severest finding so
-  // reviewEventForSeverity does not post a blocking finding as a non-blocking COMMENT.
-  const highestFromCounts = expectedHighestSeverity(findings);
-  const findingSeverities = [
-    ...review.inline_comments.map((comment) => comment.severity),
-    ...review.unplaced_findings.map((finding) => finding.severity),
-  ];
-  review.highest_severity = findingSeverities.reduce(
-    (highest, severity) =>
-      SEVERITIES.indexOf(severity) > SEVERITIES.indexOf(highest) ? severity : highest,
-    highestFromCounts,
-  );
+  // Recompute public counts and highest_severity from bounded structured findings rather than
+  // trusting model-provided summary fields.
+  review.findings = countFindingsBySeverity(review.inline_comments, review.unplaced_findings);
+  review.highest_severity = expectedHighestSeverity(review.findings);
 }
 
 function readReviewOutput(path) {
@@ -608,8 +654,10 @@ module.exports = async function postReview({ github, context, core }) {
 module.exports.parsePatchLines = parsePatchLines;
 module.exports.validateReview = validateReview;
 module.exports.expectedHighestSeverity = expectedHighestSeverity;
+module.exports.countFindingsBySeverity = countFindingsBySeverity;
 module.exports.buildReviewBody = buildReviewBody;
 module.exports.reviewEventForSeverity = reviewEventForSeverity;
 module.exports.isDismissableCodexReview = isDismissableCodexReview;
 module.exports.CODEX_REVIEW_MARKER = CODEX_REVIEW_MARKER;
 module.exports.CODEX_INLINE_MARKER = CODEX_INLINE_MARKER;
+module.exports.REVIEW_LIMITS = REVIEW_LIMITS;
