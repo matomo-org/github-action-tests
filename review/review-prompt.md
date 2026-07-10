@@ -10,9 +10,9 @@ Critical trust policy:
 Review scope:
 - Review only the explicit PR diff described in the context below.
 - The checked-out working tree is the PR merge ref.
-- A pinned read-only Matomo core checkout is available at `{{MATOMO_CORE_PATH}}` for framework,
+- A read-only Matomo core checkout is available at `{{MATOMO_CORE_PATH}}` for framework,
   core, and sibling-plugin context only. It is not part of the PR diff.
-- Additional core/plugin context is listed in `{{MATOMO_CORE_CONTEXT}}`.
+- Additional core/plugin context, including the requested core ref and resolved core SHA, is listed in `{{MATOMO_CORE_CONTEXT}}`.
 - If populated, this plugin is also mapped into the core checkout at
   `{{PLUGIN_IN_CORE_PATH}}` so read-only commands that expect a
   `plugins/{{PLUGIN_NAME}}` path can inspect the plugin in a core-like layout.

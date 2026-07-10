@@ -32,9 +32,9 @@ on:
         default: 'matomo-org/matomo'
       matomo-core-ref:
         type: string
-        description: 'Pinned Matomo core ref to check out for read-only review context.'
+        description: 'Matomo core ref to check out for read-only review context.'
         required: false
-        default: '84017ed00948fca0db087ea24612723ca8d9df83'
+        default: '5.x-dev'
       plugin-name:
         type: string
         description: 'Optional plugin name. If empty, the workflow reads name from plugin.json when present.'
@@ -266,6 +266,7 @@ jobs:
           set -euo pipefail
 
           plugin_name="$PLUGIN_NAME_INPUT"
+          matomo_core_sha="$(git -C matomo-core rev-parse HEAD)"
           if [ -z "$plugin_name" ] && [ -f pr/plugin.json ]; then
             # plugin.json comes from the untrusted PR; a malformed file must not abort the review
             # (set -e would kill the step on a JSON.parse throw), so swallow parse errors and treat
@@ -286,7 +287,7 @@ jobs:
           if [ -n "$plugin_name" ]; then
             mkdir -p matomo-core/plugins
             plugin_in_core_path="$GITHUB_WORKSPACE/matomo-core/plugins/$plugin_name"
-            # The pinned core checkout may already bundle a plugin of this name. Always map the PR
+            # The core checkout may already bundle a plugin of this name. Always map the PR
             # checkout here so Codex inspects the PR's code, not the stale core copy; replace whatever
             # exists (a real core plugin directory or a leftover link). plugin_name is validated to
             # [A-Za-z0-9_]+ above, so this rm -rf cannot escape matomo-core/plugins.
@@ -298,6 +299,7 @@ jobs:
           export CONTEXT_FILE="$context_file"
           export PLUGIN_NAME="$plugin_name"
           export PLUGIN_IN_CORE_PATH="$plugin_in_core_path"
+          export MATOMO_CORE_SHA="$matomo_core_sha"
           node -e '
             const fs = require("fs");
             fs.writeFileSync(process.env.CONTEXT_FILE, `${JSON.stringify({
@@ -305,6 +307,7 @@ jobs:
               plugin_repository_path: `${process.env.GITHUB_WORKSPACE}/pr`,
               matomo_core_repository: process.env.MATOMO_CORE_REPOSITORY,
               matomo_core_ref: process.env.MATOMO_CORE_REF,
+              matomo_core_sha: process.env.MATOMO_CORE_SHA,
               matomo_core_path: `${process.env.GITHUB_WORKSPACE}/matomo-core`,
               plugin_in_core_path: process.env.PLUGIN_IN_CORE_PATH,
             }, null, 2)}\n`);

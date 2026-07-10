@@ -62,13 +62,15 @@ This repository does not provide a central key to callers.
 
 ## Core Context
 
-The workflow checks out a pinned read-only Matomo core tree for review context.
+The workflow checks out a read-only Matomo core tree for review context.
 This gives the existing `matomo-review` and plugin architecture skills access to
 core files and sibling plugins that standalone plugin repositories do not have.
 
-By default the workflow checks out `matomo-org/matomo` at
-`84017ed00948fca0db087ea24612723ca8d9df83`. Override `matomo-core-ref` only when
-you intentionally want to move that shared context pin.
+By default the workflow checks out `matomo-org/matomo` at `5.x-dev`, matching
+the current Matomo development baseline used by plugin work. The resolved core
+commit SHA is written to the uploaded `codex-review-core-context.json`
+diagnostics artifact for auditability. Override `matomo-core-ref` when a review
+needs a different core branch, tag, or commit.
 
 When a plugin name can be read from `plugin.json`, the workflow also maps the PR
 checkout into the core tree at `matomo-core/plugins/<PluginName>` for read-only
@@ -177,7 +179,7 @@ address.
 | `automation-paths` | no | `.github/workflows/codex-review.yml`, `.github/codex/` | Caller-repository paths that require human review before Codex runs. Entries ending in `/` match by prefix. |
 | `matomo-agent-skills-ref` | no | `main` | Ref of `matomo-org/matomo-agent-skills` to install. |
 | `matomo-core-repository` | no | `matomo-org/matomo` | Matomo core repository used for read-only review context. |
-| `matomo-core-ref` | no | `84017ed00948fca0db087ea24612723ca8d9df83` | Pinned Matomo core ref used for read-only review context. |
+| `matomo-core-ref` | no | `5.x-dev` | Matomo core ref used for read-only review context. |
 | `plugin-name` | no | read from `plugin.json` | Plugin name used for the optional core-layout mapping. |
 | `codex-model` | no | `gpt-5.5` | OpenAI model passed to `openai/codex-action`. Override only to move off the default. |
 | `codex-effort` | no | `xhigh` | Reasoning effort passed to `openai/codex-action` (`minimal`, `low`, `medium`, `high`, or `xhigh`). |
@@ -187,4 +189,3 @@ address.
 | Secret | Required | Description |
 | --- | --- | --- |
 | `OPENAI_API_KEY` | yes | OpenAI API key passed from the consuming repository or organization secret. |
-
