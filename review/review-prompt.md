@@ -59,6 +59,8 @@ Output policy:
   posted inline comments with the severity badge, so keep the body focused on evidence and the fix.
 - If a finding is about unchanged nearby context but is caused by a changed line, place the inline comment on the changed line that creates the mismatch or risk.
 - Use `unplaced_findings` for useful findings that do not map cleanly to changed diff lines.
+- Every `unplaced_findings` entry must include `path` and `line`; set either field to `null` when
+  the finding cannot be mapped to a specific changed path or line.
 - `diagnostics_markdown` should include the detailed `$matomo-review` notes, including exact read-only commands run, validation delegated to CI, structural-integrity details, confidence caveats, and limitations.
 
 PR title:

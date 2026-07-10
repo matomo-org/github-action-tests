@@ -94,8 +94,7 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "comment": "path and line are optional: unplaced findings are precisely those that do not map to a diff line. This matches validateReview in post-review.js, which accepts them absent or null.",
-        "required": ["severity", "body"],
+        "required": ["severity", "body", "path", "line"],
         "properties": {
           "severity": {
             "type": "string",

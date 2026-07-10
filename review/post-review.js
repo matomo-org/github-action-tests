@@ -150,15 +150,20 @@ function validateReview(review) {
     assertString(finding.body, `unplaced_findings[${index}].body`, {
       maxLength: REVIEW_LIMITS.findingBodyMaxLength,
     });
-    // path and line are nullable per the schema; the mapping step re-derives placement from them.
-    if (finding.path !== null && finding.path !== undefined && typeof finding.path !== 'string') {
+    // path and line are required by the strict response schema, but nullable when no placement exists.
+    if (!Object.prototype.hasOwnProperty.call(finding, 'path')) {
+      throw new Error(`unplaced_findings[${index}].path is required`);
+    }
+    if (!Object.prototype.hasOwnProperty.call(finding, 'line')) {
+      throw new Error(`unplaced_findings[${index}].line is required`);
+    }
+    if (finding.path !== null && typeof finding.path !== 'string') {
       throw new Error(`unplaced_findings[${index}].path must be a string or null`);
     }
     if (typeof finding.path === 'string' && finding.path.length > REVIEW_LIMITS.pathMaxLength) {
       throw new Error(`unplaced_findings[${index}].path must be at most ${REVIEW_LIMITS.pathMaxLength} characters`);
     }
-    if (finding.line !== null && finding.line !== undefined
-      && (!Number.isInteger(finding.line) || finding.line < 1)) {
+    if (finding.line !== null && (!Number.isInteger(finding.line) || finding.line < 1)) {
       throw new Error(`unplaced_findings[${index}].line must be a positive integer or null`);
     }
   }

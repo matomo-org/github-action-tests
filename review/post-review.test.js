@@ -170,16 +170,6 @@ test('validateReview: ignores inconsistent model-provided finding counts', () =>
   assert.equal(structuredFindingsWin.highest_severity, 'low');
 });
 
-test('validateReview: accepts unplaced findings with path and line omitted entirely', () => {
-  // The schema marks path/line as optional (nullable) for unplaced findings, so a payload that
-  // omits them must pass the backstop validator too.
-  const review = validReview({
-    findings: { blocking: 0, medium: 1, low_polish: 0 },
-    unplaced_findings: [{ severity: 'medium', body: 'b' }],
-  });
-  assert.doesNotThrow(() => validateReview(review));
-});
-
 test('validateReview: rejects non-object payloads', () => {
   for (const bad of [null, undefined, [], 'x', 42]) {
     assert.throws(() => validateReview(bad));
@@ -270,7 +260,11 @@ test('validateReview: accepts unplaced findings with null path and line', () => 
   assert.doesNotThrow(() => validateReview(review));
 });
 
-test('validateReview: rejects unplaced findings with invalid severity or line', () => {
+test('validateReview: rejects unplaced findings with missing or invalid nullable placement fields', () => {
+  assert.throws(() => validateReview(validReview({ unplaced_findings: [{ severity: 'low', body: 'b', line: null }] })), /path is required/);
+  assert.throws(() => validateReview(validReview({ unplaced_findings: [{ severity: 'low', body: 'b', path: null }] })), /line is required/);
+  assert.throws(() => validateReview(validReview({ unplaced_findings: [{ severity: 'low', body: 'b', path: undefined, line: null }] })), /path must be a string or null/);
+  assert.throws(() => validateReview(validReview({ unplaced_findings: [{ severity: 'low', body: 'b', path: null, line: undefined }] })), /positive integer or null/);
   assert.throws(() => validateReview(validReview({ unplaced_findings: [{ severity: 'nope', body: 'b', path: null, line: null }] })));
   assert.throws(() => validateReview(validReview({ unplaced_findings: [{ severity: 'low', body: 'b', path: 'a.js', line: 0 }] })), /positive integer or null/);
 });
@@ -911,6 +905,38 @@ test('review-output schema stays aligned with the post-review validator limits',
   assert.equal(schema.properties.unplaced_findings.maxItems, REVIEW_LIMITS.unplacedFindingsMaxItems);
   assert.equal(schema.properties.unplaced_findings.items.properties.path.maxLength, REVIEW_LIMITS.pathMaxLength);
   assert.equal(schema.properties.unplaced_findings.items.properties.body.maxLength, REVIEW_LIMITS.findingBodyMaxLength);
+});
+
+test('review-output schema object properties are all required for strict response format', () => {
+  const schema = JSON.parse(fs.readFileSync(
+    path.join(__dirname, 'review-output.schema.json'),
+    'utf8',
+  ));
+
+  function assertStrictRequiredProperties(node, schemaPath) {
+    if (!node || typeof node !== 'object') {
+      return;
+    }
+
+    if (node.properties) {
+      const propertyKeys = Object.keys(node.properties).sort();
+      assert.ok(Array.isArray(node.required), `${schemaPath}.required must be an array`);
+      assert.deepEqual(
+        [...node.required].sort(),
+        propertyKeys,
+        `${schemaPath}.required must include every property for OpenAI strict response format`,
+      );
+    }
+
+    for (const [key, value] of Object.entries(node.properties || {})) {
+      assertStrictRequiredProperties(value, `${schemaPath}.properties.${key}`);
+    }
+    if (node.items) {
+      assertStrictRequiredProperties(node.items, `${schemaPath}.items`);
+    }
+  }
+
+  assertStrictRequiredProperties(schema, 'schema');
 });
 
 test('workflow action references stay pinned to full commit SHAs', () => {
