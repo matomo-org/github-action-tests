@@ -11,13 +11,16 @@ const os = require('node:os');
 const path = require('node:path');
 
 const postReview = require('./post-review.js');
+const { buildCodexReviewHeader } = require('./review-constants');
 const {
   parsePatchLines,
   resolveReviewOutputPath,
+  readReviewOutput,
   validateReview,
   expectedHighestSeverity,
   countFindingsBySeverity,
   buildReviewBody,
+  formatInlineCommentBody,
   reviewEventForSeverity,
   isDismissableCodexReview,
   CODEX_REVIEW_MARKER,
@@ -25,6 +28,9 @@ const {
   CODEX_REVIEW_OUTPUT_FILE,
   REVIEW_LIMITS,
 } = postReview;
+
+const REVIEWED_HEAD_SHA = 'a'.repeat(40);
+const REVIEWED_BASE_SHA = 'b'.repeat(40);
 
 // --- parsePatchLines --------------------------------------------------------
 
@@ -174,6 +180,35 @@ test('validateReview: rejects non-object payloads', () => {
   for (const bad of [null, undefined, [], 'x', 42]) {
     assert.throws(() => validateReview(bad));
   }
+});
+
+test('validateReview: rejects unknown properties at every structured object boundary', () => {
+  assert.throws(
+    () => validateReview({ ...validReview(), unexpected: true }),
+    /Codex output must contain exactly these properties/,
+  );
+  assert.throws(
+    () => validateReview(validReview({
+      findings: { blocking: 0, medium: 0, low_polish: 0, critical: 1 },
+    })),
+    /findings must contain exactly these properties/,
+  );
+  assert.throws(
+    () => validateReview(validReview({
+      inline_comments: [{
+        path: 'a.js', line: 1, side: 'RIGHT', severity: 'low', body: 'b', rule_source: null, command: 'run me',
+      }],
+    })),
+    /inline_comments\[0\] must contain exactly these properties/,
+  );
+  assert.throws(
+    () => validateReview(validReview({
+      unplaced_findings: [{
+        severity: 'low', body: 'b', path: null, line: null, html: '<script>',
+      }],
+    })),
+    /unplaced_findings\[0\] must contain exactly these properties/,
+  );
 });
 
 test('validateReview: rejects missing or empty required string fields', () => {
@@ -339,7 +374,9 @@ test('buildReviewBody: embeds the marker, the severity table, and the inline-cou
     review,
     [{ severity: 'medium', body: 'floating finding', path: null, line: null }],
     0,
+    REVIEWED_BASE_SHA,
   );
+  assert.ok(withUnplaced.startsWith(`${buildCodexReviewHeader(REVIEWED_BASE_SHA)}\n`));
   assert.ok(withUnplaced.includes(CODEX_REVIEW_MARKER));
   assert.match(withUnplaced, /\| ⚠️ Medium \| 2 \|/);
   assert.match(withUnplaced, /\| 💬 Low \/ Polish \| 1 \|/);
@@ -347,15 +384,68 @@ test('buildReviewBody: embeds the marker, the severity table, and the inline-cou
   assert.match(withUnplaced, /floating finding/);
   assert.match(withUnplaced, /Short summary\./);
 
-  const placed = buildReviewBody(review, [], 3);
+  const placed = buildReviewBody(review, [], 3, REVIEWED_BASE_SHA);
   assert.match(placed, /Posted 3 inline findings\./);
 
   const noFindings = buildReviewBody(
     { ...review, findings: { blocking: 0, medium: 0, low_polish: 0 } },
     [],
     0,
+    REVIEWED_BASE_SHA,
   );
   assert.match(noFindings, /No inline findings to place\./);
+});
+
+test('buildReviewBody: caps the public body and reports findings retained only in diagnostics', () => {
+  const unplaced = Array.from({ length: 40 }, (_, index) => ({
+    severity: 'blocking',
+    body: `finding-${index}-${'x'.repeat(REVIEW_LIMITS.findingBodyMaxLength - 11)}`,
+    path: `${index}-${'p'.repeat(REVIEW_LIMITS.pathMaxLength - String(index).length - 1)}`,
+    line: index + 1,
+  }));
+  const review = validReview({
+    review_body_markdown: 's'.repeat(REVIEW_LIMITS.reviewBodyMarkdownMaxLength),
+    highest_severity: 'blocking',
+    findings: { blocking: unplaced.length, medium: 0, low_polish: 0 },
+  });
+
+  const body = buildReviewBody(review, unplaced, 0, REVIEWED_BASE_SHA);
+
+  assert.ok(body.length <= REVIEW_LIMITS.publicReviewBodyMaxLength);
+  assert.match(body, /additional unplaced findings omitted from this review body/);
+  assert.match(body, /workflow artifact for the complete output/);
+  assert.match(body, /finding-0-/);
+  assert.doesNotMatch(body, /finding-39-/);
+});
+
+test('public review Markdown neutralizes mentions and safely displays untrusted metadata', () => {
+  const review = validReview({
+    review_body_markdown: 'Please notify @octocat or reviewer@example.com.',
+    highest_severity: 'medium',
+    findings: { blocking: 0, medium: 1, low_polish: 0 },
+  });
+  const body = buildReviewBody(review, [{
+    severity: 'medium',
+    body: 'Escalate to @matomo-org/security.',
+    path: 'src/odd`name\n@reviewers.js',
+    line: 7,
+  }], 0, REVIEWED_BASE_SHA);
+
+  assert.match(body, /@\u200boctocat/);
+  assert.match(body, /@\u200bmatomo-org\/security/);
+  assert.match(body, /@\u200breviewers\.js/);
+  assert.match(body, /<U\+000A>/);
+  assert.match(body, /reviewer@\u200bexample\.com/);
+  assert.doesNotMatch(body, /@octocat|@matomo-org\/security|@reviewers\.js|@example\.com/);
+
+  const inlineBody = formatInlineCommentBody({
+    severity: 'low',
+    body: 'Ask @octocat.',
+    rule_source: 'skill`name @matomo-org/security',
+  });
+  assert.match(inlineBody, /@\u200boctocat/);
+  assert.match(inlineBody, /@\u200bmatomo-org\/security/);
+  assert.match(inlineBody, /`` skill`name/);
 });
 
 // --- postReview orchestration (fake GitHub client, no network) ---------------
@@ -364,8 +454,11 @@ function fakeGithub({
   files = [],
   reviews = [],
   reviewComments = [],
+  liveHeadSha = REVIEWED_HEAD_SHA,
+  liveBaseSha = REVIEWED_BASE_SHA,
   createReviewErrors = [],
   dismissReviewErrors = [],
+  getPullError = null,
   listFilesError = null,
   listReviewsError = null,
 } = {}) {
@@ -374,8 +467,10 @@ function fakeGithub({
   // review id so the stale-inline-comment cleanup can distinguish the new review from prior ones.
   const calls = {
     createReview: [], dismissReview: [], createComment: [],
-    deleteReviewComment: [], listFiles: 0, listReviews: 0, listReviewComments: 0, order: [],
+    deleteReviewComment: [], getPull: 0, listFiles: 0, listReviews: 0,
+    listReviewComments: 0, order: [],
   };
+  const currentReviews = [...reviews];
   let createReviewCall = 0;
   let dismissReviewCall = 0;
   const github = {
@@ -383,8 +478,13 @@ function fakeGithub({
     paginate: async (fn) => fn(),
     rest: {
       pulls: {
+        get: async () => {
+          calls.getPull += 1;
+          if (getPullError) throw getPullError;
+          return { data: { head: { sha: liveHeadSha }, base: { sha: liveBaseSha } } };
+        },
         listFiles: async () => { calls.listFiles += 1; if (listFilesError) throw listFilesError; return files; },
-        listReviews: async () => { calls.listReviews += 1; if (listReviewsError) throw listReviewsError; return reviews; },
+        listReviews: async () => { calls.listReviews += 1; if (listReviewsError) throw listReviewsError; return currentReviews; },
         listReviewComments: async () => { calls.listReviewComments += 1; return reviewComments; },
         createReview: async (params) => {
           calls.createReview.push(params);
@@ -393,6 +493,13 @@ function fakeGithub({
           const id = 1000 + createReviewCall;
           createReviewCall += 1;
           if (err) throw err;
+          currentReviews.push({
+            id,
+            user: { login: 'github-actions[bot]' },
+            state: params.event === 'REQUEST_CHANGES' ? 'CHANGES_REQUESTED' : 'COMMENTED',
+            body: params.body,
+            commit_id: params.commit_id,
+          });
           return { data: { id } };
         },
         dismissReview: async (params) => {
@@ -413,7 +520,10 @@ function fakeGithub({
 }
 
 function fakeContext() {
-  return { repo: { owner: 'matomo-org', repo: 'plugin-Example' }, payload: { pull_request: { number: 7 } } };
+  return {
+    repo: { owner: 'matomo-org', repo: 'plugin-Example' },
+    payload: { pull_request: { number: 7, head: { sha: REVIEWED_HEAD_SHA } } },
+  };
 }
 
 function fakeCore() {
@@ -429,6 +539,7 @@ function fakeCore() {
 }
 
 function setEnv(t, vars) {
+  vars = { REVIEWED_BASE_SHA, REVIEWED_HEAD_SHA, ...vars };
   const saved = {};
   for (const [key, value] of Object.entries(vars)) {
     saved[key] = process.env[key];
@@ -496,6 +607,21 @@ test('resolveReviewOutputPath: rejects output files that resolve outside the out
   );
 });
 
+test('readReviewOutput: rejects non-files and files over the byte limit before parsing', (t) => {
+  const directoryOutput = fs.mkdtempSync(path.join(os.tmpdir(), 'codex-review-directory-'));
+  fs.mkdirSync(path.join(directoryOutput, CODEX_REVIEW_OUTPUT_FILE));
+  t.after(() => fs.rmSync(directoryOutput, { recursive: true, force: true }));
+  assert.throws(() => readReviewOutput(directoryOutput), /must be a regular file/);
+
+  const oversizedOutput = fs.mkdtempSync(path.join(os.tmpdir(), 'codex-review-oversized-'));
+  fs.writeFileSync(
+    path.join(oversizedOutput, CODEX_REVIEW_OUTPUT_FILE),
+    'x'.repeat(REVIEW_LIMITS.reviewOutputFileMaxBytes + 1),
+  );
+  t.after(() => fs.rmSync(oversizedOutput, { recursive: true, force: true }));
+  assert.throws(() => readReviewOutput(oversizedOutput), /must be at most .* bytes/);
+});
+
 test('postReview: posts a comment and no review on a preflight safety failure', async (t) => {
   setEnv(t, {
     PREFLIGHT_SAFETY_FAILURE: 'true',
@@ -507,6 +633,62 @@ test('postReview: posts a comment and no review on a preflight safety failure', 
   await postReview({ github, context: fakeContext(), core: fakeCore() });
   assert.equal(calls.createComment.length, 1);
   assert.equal(calls.createComment[0].body, 'automation files changed');
+  assert.equal(calls.createReview.length, 0);
+});
+
+test('postReview: neutralizes mentions in preflight feedback', async (t) => {
+  setEnv(t, {
+    PREFLIGHT_SAFETY_FAILURE: 'true',
+    PREFLIGHT_SAFETY_MESSAGE: 'Automation path requested @matomo-org/security review.',
+    CODEX_RESULT: 'skipped',
+    RUN_URL: 'https://example/run',
+  });
+  const { github, calls } = fakeGithub();
+
+  await postReview({ github, context: fakeContext(), core: fakeCore() });
+
+  assert.equal(calls.createComment.length, 1);
+  assert.match(calls.createComment[0].body, /@\u200bmatomo-org\/security/);
+  assert.doesNotMatch(calls.createComment[0].body, /@matomo-org\/security/);
+});
+
+test('postReview: rejects an invalid frozen head SHA before any GitHub API mutation', async (t) => {
+  setEnv(t, {
+    PREFLIGHT_SAFETY_FAILURE: 'false',
+    PREFLIGHT_SKIP_REASON: '',
+    CODEX_RESULT: 'success',
+    REVIEWED_HEAD_SHA: 'refs/heads/main',
+    RUN_URL: 'https://example/run',
+  });
+  const { github, calls } = fakeGithub();
+
+  await assert.rejects(
+    postReview({ github, context: fakeContext(), core: fakeCore() }),
+    /lowercase 40-character commit SHA/,
+  );
+
+  assert.equal(calls.getPull, 0);
+  assert.equal(calls.createComment.length, 0);
+  assert.equal(calls.createReview.length, 0);
+});
+
+test('postReview: rejects an invalid frozen base SHA before any GitHub API mutation', async (t) => {
+  setEnv(t, {
+    PREFLIGHT_SAFETY_FAILURE: 'false',
+    PREFLIGHT_SKIP_REASON: '',
+    CODEX_RESULT: 'success',
+    REVIEWED_BASE_SHA: 'refs/heads/main',
+    RUN_URL: 'https://example/run',
+  });
+  const { github, calls } = fakeGithub();
+
+  await assert.rejects(
+    postReview({ github, context: fakeContext(), core: fakeCore() }),
+    /REVIEWED_BASE_SHA must be a lowercase 40-character commit SHA/,
+  );
+
+  assert.equal(calls.getPull, 0);
+  assert.equal(calls.createComment.length, 0);
   assert.equal(calls.createReview.length, 0);
 });
 
@@ -576,6 +758,7 @@ test('postReview: places an inline comment that maps to a changed diff line', as
   assert.equal(calls.createReview.length, 1);
   const submitted = calls.createReview[0];
   assert.equal(submitted.event, 'REQUEST_CHANGES');
+  assert.equal(submitted.commit_id, REVIEWED_HEAD_SHA);
   assert.equal(submitted.comments.length, 1);
   assert.equal(submitted.comments[0].path, 'a.js');
   assert.equal(submitted.comments[0].line, 3);
@@ -634,19 +817,26 @@ test('postReview: retries without inline comments when GitHub rejects them with 
   assert.equal(calls.createReview.length, 2);
   assert.equal(calls.createReview[0].comments.length, 1); // first attempt: inline
   assert.equal(calls.createReview[1].comments.length, 0); // fallback: comment-free
+  assert.equal(calls.createReview[1].commit_id, REVIEWED_HEAD_SHA);
   assert.match(calls.createReview[1].body, /Bug here/); // finding folded into the body
   assert.equal(calls.createReview[1].event, 'REQUEST_CHANGES'); // fallback must not downgrade the verdict
   assert.ok(core.warnings.some((w) => /Retrying without inline comments/.test(w)));
 });
 
-test('postReview: dismisses a previous blocking Codex review after posting the new one', async (t) => {
+test('postReview: dismisses a previous blocking Codex review but keeps the new blocking review', async (t) => {
   const previous = {
     id: 555,
     user: { login: 'github-actions[bot]' },
     state: 'CHANGES_REQUESTED',
     body: `old ${CODEX_REVIEW_MARKER}`,
   };
-  const file = writeTempReview(t, reviewJson({ findings: { blocking: 0, medium: 0, low_polish: 0 }, highest_severity: 'none' }));
+  const file = writeTempReview(t, reviewJson({
+    findings: { blocking: 1, medium: 0, low_polish: 0 },
+    highest_severity: 'blocking',
+    unplaced_findings: [{
+      severity: 'blocking', body: 'new blocking finding', path: null, line: null,
+    }],
+  }));
   setEnv(t, {
     PREFLIGHT_SAFETY_FAILURE: 'false',
     PREFLIGHT_SKIP_REASON: '',
@@ -660,10 +850,75 @@ test('postReview: dismisses a previous blocking Codex review after posting the n
   assert.equal(calls.dismissReview.length, 1);
   assert.equal(calls.dismissReview[0].review_id, 555);
   assert.equal(calls.createReview.length, 1);
-  assert.equal(calls.createReview[0].event, 'COMMENT'); // no findings -> COMMENT, never APPROVE
+  assert.equal(calls.createReview[0].event, 'REQUEST_CHANGES');
   // The new review must be created before the old one is dismissed, so a create failure can never
   // leave the PR with no Codex review at all.
   assert.deepEqual(calls.order, ['createReview', 'dismissReview']);
+});
+
+test('postReview: does not attach a completed review to a newer pull request head', async (t) => {
+  const file = writeTempReview(t, reviewJson());
+  setEnv(t, {
+    PREFLIGHT_SAFETY_FAILURE: 'false',
+    PREFLIGHT_SKIP_REASON: '',
+    CODEX_RESULT: 'success',
+    RUN_URL: 'https://example/run',
+    CODEX_OUTPUT_DIR: path.dirname(file),
+  });
+  const { github, calls } = fakeGithub({ liveHeadSha: 'b'.repeat(40) });
+  const core = fakeCore();
+
+  await postReview({ github, context: fakeContext(), core });
+
+  assert.equal(calls.getPull, 1);
+  assert.equal(calls.listFiles, 0);
+  assert.equal(calls.createReview.length, 0);
+  assert.equal(calls.createComment.length, 1);
+  assert.match(calls.createComment[0].body, /head changed before the review could be posted/);
+  assert.ok(core.warnings.some((warning) => /pull request head is now/.test(warning)));
+});
+
+test('postReview: does not attach a completed review after the pull request base changes', async (t) => {
+  const file = writeTempReview(t, reviewJson());
+  setEnv(t, {
+    PREFLIGHT_SAFETY_FAILURE: 'false',
+    PREFLIGHT_SKIP_REASON: '',
+    CODEX_RESULT: 'success',
+    RUN_URL: 'https://example/run',
+    CODEX_OUTPUT_DIR: path.dirname(file),
+  });
+  const { github, calls } = fakeGithub({ liveBaseSha: 'c'.repeat(40) });
+  const core = fakeCore();
+
+  await postReview({ github, context: fakeContext(), core });
+
+  assert.equal(calls.getPull, 1);
+  assert.equal(calls.listFiles, 0);
+  assert.equal(calls.createReview.length, 0);
+  assert.equal(calls.createComment.length, 1);
+  assert.match(calls.createComment[0].body, /base changed before the review could be posted/);
+  assert.ok(core.warnings.some((warning) => /pull request base is now/.test(warning)));
+});
+
+test('postReview: fails closed when the current pull request head cannot be verified', async (t) => {
+  const file = writeTempReview(t, reviewJson());
+  setEnv(t, {
+    PREFLIGHT_SAFETY_FAILURE: 'false',
+    PREFLIGHT_SKIP_REASON: '',
+    CODEX_RESULT: 'success',
+    RUN_URL: 'https://example/run',
+    CODEX_OUTPUT_DIR: path.dirname(file),
+  });
+  const getPullError = Object.assign(new Error('API unavailable'), { status: 500 });
+  const { github, calls } = fakeGithub({ getPullError });
+  const core = fakeCore();
+
+  await postReview({ github, context: fakeContext(), core });
+
+  assert.equal(calls.createReview.length, 0);
+  assert.equal(calls.createComment.length, 1);
+  assert.match(calls.createComment[0].body, /head could not be verified/);
+  assert.equal(core.failures.length, 1);
 });
 
 test('postReview: does not dismiss previous reviews when creating the new review fails', async (t) => {
@@ -872,18 +1127,43 @@ test('postReview: deletes stale Codex inline comments from previous runs but kee
 
 // --- cross-file invariant ---------------------------------------------------
 
-test('CODEX_REVIEW_MARKER stays byte-identical in the preflight workflow', () => {
+test('preflight and posting share the same review marker constant', () => {
+  const preflight = fs.readFileSync(
+    path.join(__dirname, 'preflight.js'),
+    'utf8',
+  );
+  assert.match(preflight, /require\('\.\/review-constants'\)/);
+  assert.equal(require('./review-constants').CODEX_REVIEW_MARKER, CODEX_REVIEW_MARKER);
+});
+
+test('workflow and documented caller keep the trusted frozen-head review flow', () => {
   const workflow = fs.readFileSync(
     path.join(__dirname, '..', '.github', 'workflows', 'codex-review.yml'),
     'utf8',
   );
-  // The preflight job in codex-review.yml matches this literal to detect and supersede prior Codex
-  // reviews. The two copies are maintained by hand (preflight cannot require this module), so guard
-  // against silent drift that would break dedup/dismissal.
-  assert.ok(
-    workflow.includes(CODEX_REVIEW_MARKER),
-    'codex-review.yml no longer contains the exact CODEX_REVIEW_MARKER literal from post-review.js',
+  const readme = fs.readFileSync(path.join(__dirname, 'README.md'), 'utf8');
+  const preflight = fs.readFileSync(path.join(__dirname, 'preflight.js'), 'utf8');
+
+  assert.match(readme, /on:\n  pull_request_target:\n    types: \[labeled\]/);
+  assert.match(workflow, /validateReviewRequest/);
+  assert.match(preflight, /context\.eventName !== 'pull_request_target'/);
+  assert.match(preflight, /'diff', '--no-renames', '--name-only', '-z'/);
+  assert.match(workflow, /ref: \$\{\{ needs\.preflight\.outputs\.head_sha \}\}/);
+  assert.match(workflow, /REVIEWED_BASE_SHA: \$\{\{ needs\.preflight\.outputs\.base_sha \}\}/);
+  assert.match(workflow, /REVIEWED_HEAD_SHA: \$\{\{ needs\.preflight\.outputs\.head_sha \}\}/);
+  assert.doesNotMatch(workflow, /refs\/pull\/.*\/merge|MERGE_REF/);
+});
+
+test('workflow and documentation use the requested default Codex model', () => {
+  const workflow = fs.readFileSync(
+    path.join(__dirname, '..', '.github', 'workflows', 'codex-review.yml'),
+    'utf8',
   );
+  const readme = fs.readFileSync(path.join(__dirname, 'README.md'), 'utf8');
+
+  assert.match(workflow, /default: 'gpt-5\.6-sol'/);
+  assert.match(readme, /\| `codex-model` \| no \| `gpt-5\.6-sol` \|/);
+  assert.doesNotMatch(`${workflow}\n${readme}`, /gpt-5\.5/);
 });
 
 test('review-output schema stays aligned with the post-review validator limits', () => {
@@ -920,6 +1200,11 @@ test('review-output schema object properties are all required for strict respons
 
     if (node.properties) {
       const propertyKeys = Object.keys(node.properties).sort();
+      assert.equal(
+        node.additionalProperties,
+        false,
+        `${schemaPath}.additionalProperties must remain false`,
+      );
       assert.ok(Array.isArray(node.required), `${schemaPath}.required must be an array`);
       assert.deepEqual(
         [...node.required].sort(),

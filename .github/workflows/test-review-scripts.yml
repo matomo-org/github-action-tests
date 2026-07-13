@@ -7,9 +7,8 @@ on:
       - 'review/**'
       - 'package.json'
       - '.github/workflows/test-review-scripts.yml'
-      # Also run when the reusable workflow changes: post-review.test.js asserts the CODEX_REVIEW_MARKER
-      # literal stays byte-identical between post-review.js and codex-review.yml, so a change to the
-      # workflow's copy must trigger the guard.
+      # Cross-file tests keep the workflow's trust flow and documented defaults aligned with the
+      # trusted JavaScript modules, so reusable-workflow changes must run this suite too.
       - '.github/workflows/codex-review.yml'
   pull_request:
     paths:

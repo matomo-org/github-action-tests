@@ -44,7 +44,7 @@ on:
         type: string
         description: 'OpenAI model passed to openai/codex-action. Override only to move off the default.'
         required: false
-        default: 'gpt-5.5'
+        default: 'gpt-5.6-sol'
       codex-effort:
         type: string
         description: 'Reasoning effort passed to openai/codex-action (Codex model_reasoning_effort): minimal, low, medium, high, or xhigh.'
@@ -75,126 +75,67 @@ jobs:
       contents: read
       pull-requests: read
     outputs:
-      should_run: ${{ steps.preflight.outputs.should_run }}
-      safety_failure: ${{ steps.preflight.outputs.safety_failure }}
-      safety_message: ${{ steps.preflight.outputs.safety_message }}
-      skip_reason: ${{ steps.preflight.outputs.skip_reason }}
-      skip_message: ${{ steps.preflight.outputs.skip_message }}
-      changed_files: ${{ steps.preflight.outputs.changed_files }}
-      automation_files: ${{ steps.preflight.outputs.automation_files }}
+      should_run: ${{ steps.inspect.outputs.should_run || steps.request.outputs.should_run }}
+      safety_failure: ${{ steps.inspect.outputs.safety_failure || steps.request.outputs.safety_failure }}
+      safety_message: ${{ steps.inspect.outputs.safety_message || steps.request.outputs.safety_message }}
+      skip_reason: ${{ steps.inspect.outputs.skip_reason || steps.request.outputs.skip_reason }}
+      skip_message: ${{ steps.inspect.outputs.skip_message || steps.request.outputs.skip_message }}
+      changed_files: ${{ steps.inspect.outputs.changed_files || steps.request.outputs.changed_files }}
+      automation_files: ${{ steps.inspect.outputs.automation_files || steps.request.outputs.automation_files }}
+      base_sha: ${{ steps.request.outputs.base_sha }}
+      head_sha: ${{ steps.request.outputs.head_sha }}
     steps:
-      - name: Check changed files
-        id: preflight
+      - name: Checkout trusted workflow assets
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: github-action-tests
+          persist-credentials: false
+
+      - name: Validate review request
+        id: request
         uses: actions/github-script@373c709c69115d41ff229c7e5df9f8788daa9553
         env:
           ALLOWED_OWNERS: ${{ inputs.allowed-owners }}
-          AUTOMATION_PATHS: ${{ inputs.automation-paths }}
         with:
           script: |
-            const pr = context.payload.pull_request;
-            if (!pr) {
-              throw new Error('Codex review must be called from a pull_request event.');
-            }
-
-            const owner = context.repo.owner.toLowerCase();
-            const allowedOwners = process.env.ALLOWED_OWNERS
-              .split(',')
-              .map((value) => value.trim().toLowerCase())
-              .filter(Boolean);
-            if (!allowedOwners.includes(owner)) {
-              throw new Error(`Codex review is restricted to repositories owned by: ${allowedOwners.join(', ')}. Current owner: ${context.repo.owner}.`);
-            }
-
-            // Fork pull requests cannot be reviewed: GitHub withholds repository/organization secrets
-            // (including OPENAI_API_KEY) from fork-triggered runs, so Codex could never authenticate.
-            // Skip early with a clear message instead of letting the codex job fail on an empty key.
-            const headRepo = pr.head?.repo?.full_name;
-            const baseRepo = pr.base?.repo?.full_name;
-            if (!headRepo || headRepo !== baseRepo) {
-              core.setOutput('changed_files', '[]');
-              core.setOutput('automation_files', '[]');
-              core.setOutput('should_run', 'false');
-              core.setOutput('safety_failure', 'false');
-              core.setOutput('safety_message', '');
-              core.setOutput('skip_reason', 'fork_pull_request');
-              core.setOutput(
-                'skip_message',
-                'Codex review is not available for pull requests from forks because GitHub does not provide the OPENAI_API_KEY secret to fork-triggered workflow runs. Re-run the review from a branch in this repository instead.'
-              );
-              return;
-            }
-
-            // MUST stay byte-identical to CODEX_REVIEW_MARKER in review/post-review.js.
-            const codexReviewMarker = 'This Codex review supersedes any previous Codex review output for this PR.';
-            const automationPaths = process.env.AUTOMATION_PATHS
-              .split(/[\n,]/)
-              .map((value) => value.trim())
-              .filter(Boolean);
-
-            function isAutomationFile(file) {
-              return automationPaths.some((automationPath) => {
-                if (automationPath.endsWith('/')) {
-                  return file.startsWith(automationPath);
-                }
-                return file === automationPath;
-              });
-            }
-
-            const files = await github.paginate(github.rest.pulls.listFiles, {
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              pull_number: pr.number,
-              per_page: 100,
+            const { validateReviewRequest } = require('./github-action-tests/review/preflight.js');
+            await validateReviewRequest({
+              github,
+              context,
+              core,
+              allowedOwners: process.env.ALLOWED_OWNERS,
             });
 
-            const changedFiles = files.map((file) => file.filename);
-            const automationFiles = changedFiles.filter(isAutomationFile);
+      - name: Checkout frozen PR snapshot for preflight
+        if: ${{ steps.request.outputs.should_inspect == 'true' }}
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          ref: ${{ steps.request.outputs.head_sha }}
+          path: pr-preflight
+          persist-credentials: false
+          fetch-depth: 0
 
-            core.setOutput('changed_files', JSON.stringify(changedFiles));
-            core.setOutput('automation_files', JSON.stringify(automationFiles));
-            core.setOutput('skip_reason', '');
-            core.setOutput('skip_message', '');
-
-            if (automationFiles.length > 0) {
-              core.setOutput('should_run', 'false');
-              core.setOutput('safety_failure', 'true');
-              core.setOutput(
-                'safety_message',
-                `Codex review was not run because this PR changes reviewer automation files: ${automationFiles.join(', ')}. These files need human review first.`
-              );
-              return;
-            }
-
-            const reviews = await github.paginate(github.rest.pulls.listReviews, {
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              pull_number: pr.number,
-              per_page: 100,
+      - name: Inspect frozen changed files
+        if: ${{ steps.request.outputs.should_inspect == 'true' }}
+        id: inspect
+        uses: actions/github-script@373c709c69115d41ff229c7e5df9f8788daa9553
+        env:
+          AUTOMATION_PATHS: ${{ inputs.automation-paths }}
+          BASE_SHA: ${{ steps.request.outputs.base_sha }}
+          HEAD_SHA: ${{ steps.request.outputs.head_sha }}
+        with:
+          script: |
+            const path = require('node:path');
+            const { inspectFrozenChanges } = require('./github-action-tests/review/preflight.js');
+            inspectFrozenChanges({
+              core,
+              checkoutPath: path.join(process.env.GITHUB_WORKSPACE, 'pr-preflight'),
+              automationPaths: process.env.AUTOMATION_PATHS,
+              baseSha: process.env.BASE_SHA,
+              headSha: process.env.HEAD_SHA,
             });
-            const latestCodexReview = reviews
-              .filter((review) =>
-                review.user?.login === 'github-actions[bot]'
-                && ['APPROVED', 'CHANGES_REQUESTED', 'COMMENTED'].includes(review.state)
-                && typeof review.body === 'string'
-                && review.body.includes(codexReviewMarker)
-              )
-              .sort((a, b) => new Date(b.submitted_at) - new Date(a.submitted_at))[0];
-
-            if (latestCodexReview?.commit_id === pr.head.sha) {
-              const shortSha = pr.head.sha.slice(0, 12);
-              core.setOutput('should_run', 'false');
-              core.setOutput('safety_failure', 'false');
-              core.setOutput('skip_reason', 'no_new_changes');
-              core.setOutput(
-                'skip_message',
-                `Codex review was skipped because the latest Codex review already covers head commit ${shortSha}. Push a new commit before requesting another Codex review.`
-              );
-              return;
-            }
-
-            core.setOutput('should_run', 'true');
-            core.setOutput('safety_failure', 'false');
-            core.setOutput('safety_message', '');
 
   codex:
     needs: preflight
@@ -224,29 +165,20 @@ jobs:
       - name: Checkout PR
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
-          ref: refs/pull/${{ github.event.pull_request.number }}/merge
+          ref: ${{ needs.preflight.outputs.head_sha }}
           path: pr
           persist-credentials: false
           fetch-depth: 0
 
-      - name: Fetch PR refs
+      - name: Verify frozen PR snapshot
         working-directory: pr
         env:
-          PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          GH_TOKEN: ${{ github.token }}
+          BASE_SHA: ${{ needs.preflight.outputs.base_sha }}
+          HEAD_SHA: ${{ needs.preflight.outputs.head_sha }}
         run: |
           set -euo pipefail
-          # The PR checkout uses persist-credentials: false, so pr/.git/config holds no token
-          # (Codex later reads this working tree read-only and must not see credentials).
-          # Authenticate this one fetch with an in-memory extraheader: `git -c` applies the
-          # header for this invocation only and is never written to .git/config. This matches
-          # how actions/checkout authenticates against github.com.
-          auth_header="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
-          git -c "http.https://github.com/.extraheader=$auth_header" \
-            fetch --no-tags origin \
-            "$PR_BASE_REF" \
-            "+refs/pull/$PR_NUMBER/head"
+          test "$(git rev-parse HEAD)" = "$HEAD_SHA"
+          git cat-file -e "${BASE_SHA}^{commit}"
 
       - name: Checkout Matomo core context
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
@@ -359,10 +291,9 @@ jobs:
           PR_TITLE: ${{ github.event.pull_request.title }}
           PR_BODY: ${{ github.event.pull_request.body }}
           BASE_REF: ${{ github.event.pull_request.base.ref }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          BASE_SHA: ${{ needs.preflight.outputs.base_sha }}
           HEAD_REF: ${{ github.event.pull_request.head.ref }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          MERGE_REF: refs/pull/${{ github.event.pull_request.number }}/merge
+          HEAD_SHA: ${{ needs.preflight.outputs.head_sha }}
           CHANGED_FILES: ${{ needs.preflight.outputs.changed_files }}
           MATOMO_CORE_CONTEXT: ${{ steps.plugin-context.outputs.context_file }}
           MATOMO_CORE_PATH: ${{ github.workspace }}/matomo-core
@@ -434,6 +365,8 @@ jobs:
           PREFLIGHT_SAFETY_MESSAGE: ${{ needs.preflight.outputs.safety_message }}
           PREFLIGHT_SKIP_REASON: ${{ needs.preflight.outputs.skip_reason }}
           PREFLIGHT_SKIP_MESSAGE: ${{ needs.preflight.outputs.skip_message }}
+          REVIEWED_BASE_SHA: ${{ needs.preflight.outputs.base_sha }}
+          REVIEWED_HEAD_SHA: ${{ needs.preflight.outputs.head_sha }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         with:
           script: |

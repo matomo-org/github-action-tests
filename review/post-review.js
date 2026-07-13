@@ -1,6 +1,17 @@
 const fs = require('fs');
 const path = require('path');
 const { requiredEnv } = require('./env-utils');
+const {
+  COMMIT_SHA_PATTERN,
+  buildCodexReviewHeader,
+  CODEX_REVIEW_MARKER,
+  CODEX_INLINE_MARKER,
+  CODEX_REVIEW_OUTPUT_FILE,
+} = require('./review-constants');
+const {
+  formatUntrustedInlineCode,
+  neutralizeGitHubMentions,
+} = require('./markdown-utils');
 
 // Severity ranked low->high; index doubles as the ordering used to reconcile highest_severity.
 const SEVERITIES = ['none', 'low', 'medium', 'blocking'];
@@ -10,23 +21,16 @@ const FINDING_SEVERITIES = SEVERITIES.filter((severity) => severity !== 'none');
 const REVIEW_LIMITS = Object.freeze({
   reviewBodyMarkdownMaxLength: 2000,
   diagnosticsMarkdownMaxLength: 60000,
+  reviewOutputFileMaxBytes: 1024 * 1024,
+  // GitHub's documented review-body limit is higher, but keeping headroom avoids rejecting the
+  // entire review if trusted framing changes or the API's accounting differs from JS string length.
+  publicReviewBodyMaxLength: 60000,
   inlineCommentsMaxItems: 20,
   unplacedFindingsMaxItems: 20,
   pathMaxLength: 1024,
   findingBodyMaxLength: 1200,
   ruleSourceMaxLength: 128,
 });
-
-// Sentinel embedded in every Codex review body so later runs can recognise and supersede their own
-// previous reviews. The preflight job in .github/workflows/codex-review.yml matches this exact
-// string to deduplicate runs, so it MUST stay byte-identical to the literal there.
-const CODEX_REVIEW_MARKER = 'This Codex review supersedes any previous Codex review output for this PR.';
-
-// Hidden marker embedded in every inline review comment. Dismissing a superseded review does not
-// remove its inline comments, so each run finds and deletes prior Codex inline comments by this
-// marker to stop them accumulating across runs.
-const CODEX_INLINE_MARKER = '<!-- codex-review-inline -->';
-const CODEX_REVIEW_OUTPUT_FILE = 'codex-review-output.json';
 
 function expectedHighestSeverity(findings) {
   if (findings.blocking > 0) {
@@ -68,6 +72,21 @@ function assertArray(value, name, { maxItems } = {}) {
   }
 }
 
+function assertExactObjectKeys(value, name, expectedKeys) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error(`${name} must be an object`);
+  }
+
+  const actualKeys = Object.keys(value).sort();
+  const sortedExpectedKeys = [...expectedKeys].sort();
+  if (
+    actualKeys.length !== sortedExpectedKeys.length
+    || actualKeys.some((key, index) => key !== sortedExpectedKeys[index])
+  ) {
+    throw new Error(`${name} must contain exactly these properties: ${sortedExpectedKeys.join(', ')}`);
+  }
+}
+
 function countFindingsBySeverity(inlineComments, unplacedFindings) {
   const findings = { blocking: 0, medium: 0, low_polish: 0 };
   for (const finding of [...inlineComments, ...unplacedFindings]) {
@@ -86,9 +105,14 @@ function countFindingsBySeverity(inlineComments, unplacedFindings) {
 // to review-output.schema.json, so this mirrors that schema as a backstop in case enforcement is
 // absent or changes. Keep this in sync with review/review-output.schema.json.
 function validateReview(review) {
-  if (!review || typeof review !== 'object' || Array.isArray(review)) {
-    throw new Error('Codex output must be a JSON object');
-  }
+  assertExactObjectKeys(review, 'Codex output', [
+    'review_body_markdown',
+    'diagnostics_markdown',
+    'highest_severity',
+    'findings',
+    'inline_comments',
+    'unplaced_findings',
+  ]);
 
   assertString(review.review_body_markdown, 'review_body_markdown', {
     maxLength: REVIEW_LIMITS.reviewBodyMarkdownMaxLength,
@@ -103,9 +127,7 @@ function validateReview(review) {
   }
 
   const findings = review.findings;
-  if (!findings || typeof findings !== 'object' || Array.isArray(findings)) {
-    throw new Error('findings must be an object');
-  }
+  assertExactObjectKeys(findings, 'findings', ['blocking', 'medium', 'low_polish']);
   const maxFindings = REVIEW_LIMITS.inlineCommentsMaxItems + REVIEW_LIMITS.unplacedFindingsMaxItems;
   assertInteger(findings.blocking, 'findings.blocking', { max: maxFindings });
   assertInteger(findings.medium, 'findings.medium', { max: maxFindings });
@@ -119,6 +141,14 @@ function validateReview(review) {
   });
 
   for (const [index, comment] of review.inline_comments.entries()) {
+    assertExactObjectKeys(comment, `inline_comments[${index}]`, [
+      'path',
+      'line',
+      'side',
+      'severity',
+      'body',
+      'rule_source',
+    ]);
     assertString(comment.path, `inline_comments[${index}].path`, {
       maxLength: REVIEW_LIMITS.pathMaxLength,
     });
@@ -144,19 +174,26 @@ function validateReview(review) {
   }
 
   for (const [index, finding] of review.unplaced_findings.entries()) {
+    // Keep the nullable placement contract explicit: null means "not locatable" while a missing
+    // property means the structured response did not conform to the schema.
+    if (!Object.prototype.hasOwnProperty.call(finding || {}, 'path')) {
+      throw new Error(`unplaced_findings[${index}].path is required`);
+    }
+    if (!Object.prototype.hasOwnProperty.call(finding || {}, 'line')) {
+      throw new Error(`unplaced_findings[${index}].line is required`);
+    }
+    assertExactObjectKeys(finding, `unplaced_findings[${index}]`, [
+      'severity',
+      'body',
+      'path',
+      'line',
+    ]);
     if (!FINDING_SEVERITIES.includes(finding.severity)) {
       throw new Error(`unplaced_findings[${index}].severity is invalid`);
     }
     assertString(finding.body, `unplaced_findings[${index}].body`, {
       maxLength: REVIEW_LIMITS.findingBodyMaxLength,
     });
-    // path and line are required by the strict response schema, but nullable when no placement exists.
-    if (!Object.prototype.hasOwnProperty.call(finding, 'path')) {
-      throw new Error(`unplaced_findings[${index}].path is required`);
-    }
-    if (!Object.prototype.hasOwnProperty.call(finding, 'line')) {
-      throw new Error(`unplaced_findings[${index}].line is required`);
-    }
     if (finding.path !== null && typeof finding.path !== 'string') {
       throw new Error(`unplaced_findings[${index}].path must be a string or null`);
     }
@@ -192,6 +229,13 @@ function resolveReviewOutputPath(outputDir) {
 
 function readReviewOutput(outputDir) {
   const reviewOutputPath = resolveReviewOutputPath(outputDir);
+  const outputStat = fs.statSync(reviewOutputPath);
+  if (!outputStat.isFile()) {
+    throw new Error('Codex output path must be a regular file');
+  }
+  if (outputStat.size > REVIEW_LIMITS.reviewOutputFileMaxBytes) {
+    throw new Error(`Codex output file must be at most ${REVIEW_LIMITS.reviewOutputFileMaxBytes} bytes`);
+  }
   const raw = fs.readFileSync(reviewOutputPath, 'utf8').trim();
   if (!raw) {
     throw new Error('Codex output file is empty');
@@ -251,9 +295,9 @@ function parsePatchLines(patch) {
 
 function formatFinding(finding) {
   const location = finding.path
-    ? ` (${finding.path}${finding.line ? `:${finding.line}` : ''})`
+    ? ` ${neutralizeGitHubMentions(formatUntrustedInlineCode(`${finding.path}${finding.line ? `:${finding.line}` : ''}`))}`
     : '';
-  return `- **${formatSeverityBadge(finding.severity)}**${location}: ${finding.body}`;
+  return `- **${formatSeverityBadge(finding.severity)}**${location}: ${neutralizeGitHubMentions(finding.body)}`;
 }
 
 function pluralize(count, singular, plural = `${singular}s`) {
@@ -279,11 +323,11 @@ function formatInlineCommentBody(comment) {
   const lines = [
     `**${formatSeverityBadge(comment.severity)}**`,
     '',
-    comment.body,
+    neutralizeGitHubMentions(comment.body),
   ];
 
   if (comment.rule_source) {
-    lines.push('', `Rule source: \`${comment.rule_source}\``);
+    lines.push('', `Rule source: ${neutralizeGitHubMentions(formatUntrustedInlineCode(comment.rule_source))}`);
   }
 
   // Trailing hidden marker so a later run can identify and delete this comment (see
@@ -319,14 +363,14 @@ function placeInlineComment({ candidate, side, patchesByPath, comments, placedFi
   return { placed: true, patchMissing: false };
 }
 
-function buildReviewBody(review, unplaced, inlineCount) {
+function buildReviewBody(review, unplaced, inlineCount, reviewedBaseSha) {
   const hasFindings = review.findings.blocking + review.findings.medium + review.findings.low_polish > 0;
   const lines = [
-    `<!-- ${CODEX_REVIEW_MARKER} -->`,
+    ...buildCodexReviewHeader(reviewedBaseSha).split('\n'),
     `## 🤖 Codex Review: ${formatSeverityBadge(review.highest_severity)}`,
     '',
     '### Summary',
-    review.review_body_markdown.trim(),
+    neutralizeGitHubMentions(review.review_body_markdown.trim()),
     '',
     '### Findings Overview',
     '',
@@ -345,23 +389,57 @@ function buildReviewBody(review, unplaced, inlineCount) {
     lines.push('', '✅ No inline findings to place.');
   }
 
+  const footer = [
+    '',
+    '### Diagnostics',
+    'Detailed review diagnostics are available in the `codex-review-output` workflow artifact.'
+  ];
+
   if (unplaced.length > 0) {
+    const formattedFindings = unplaced.map(formatFinding);
+    let displayedCount = 0;
+
+    for (let index = 0; index < formattedFindings.length; index += 1) {
+      const candidateCount = index + 1;
+      const omittedCount = formattedFindings.length - candidateCount;
+      const candidateSection = [
+        '',
+        '<details>',
+        '<summary>Unplaced findings</summary>',
+        '',
+        ...formattedFindings.slice(0, candidateCount),
+        ...(omittedCount > 0 ? [
+          '',
+          `_${omittedCount} additional unplaced ${pluralize(omittedCount, 'finding')} omitted from this review body. See the workflow artifact for the complete output._`,
+        ] : []),
+        '',
+        '</details>',
+      ];
+      const candidateBody = `${[...lines, ...candidateSection, ...footer].join('\n')}\n`;
+
+      if (candidateBody.length > REVIEW_LIMITS.publicReviewBodyMaxLength) {
+        break;
+      }
+      displayedCount = candidateCount;
+    }
+
+    const omittedCount = formattedFindings.length - displayedCount;
     lines.push(
       '',
       '<details>',
       '<summary>Unplaced findings</summary>',
       '',
-      ...unplaced.map(formatFinding),
+      ...formattedFindings.slice(0, displayedCount),
+      ...(omittedCount > 0 ? [
+        '',
+        `_${omittedCount} additional unplaced ${pluralize(omittedCount, 'finding')} omitted from this review body. See the workflow artifact for the complete output._`,
+      ] : []),
       '',
       '</details>'
     );
   }
 
-  lines.push(
-    '',
-    '### Diagnostics',
-    'Detailed review diagnostics are available in the `codex-review-output` workflow artifact.'
-  );
+  lines.push(...footer);
 
   return `${lines.join('\n')}\n`;
 }
@@ -397,7 +475,7 @@ async function createIssueComment({ github, context, body, core }) {
       owner: context.repo.owner,
       repo: context.repo.repo,
       issue_number: context.payload.pull_request.number,
-      body,
+      body: neutralizeGitHubMentions(body),
     });
   } catch (error) {
     if (error.status === 403) {
@@ -449,7 +527,7 @@ async function deletePreviousCodexInlineComments({ github, context, core, keepRe
   }
 }
 
-async function dismissPreviousCodexReviews({ github, context, core, runUrl }) {
+async function dismissPreviousCodexReviews({ github, context, core, runUrl, keepReviewId }) {
   let reviews;
   try {
     reviews = await github.paginate(github.rest.pulls.listReviews, {
@@ -463,7 +541,9 @@ async function dismissPreviousCodexReviews({ github, context, core, runUrl }) {
     return;
   }
 
-  const previousCodexReviews = reviews.filter(isDismissableCodexReview);
+  const previousCodexReviews = reviews.filter(
+    (review) => review.id !== keepReviewId && isDismissableCodexReview(review),
+  );
 
   for (const previousReview of previousCodexReviews) {
     try {
@@ -522,6 +602,57 @@ module.exports = async function postReview({ github, context, core }) {
       context,
       core,
       body: `Codex review failed before producing a usable review. Workflow run: ${runUrl}`,
+    });
+    return;
+  }
+
+  const reviewedBaseSha = requiredEnv('REVIEWED_BASE_SHA');
+  const reviewedHeadSha = requiredEnv('REVIEWED_HEAD_SHA');
+  if (!COMMIT_SHA_PATTERN.test(reviewedBaseSha)) {
+    throw new Error('REVIEWED_BASE_SHA must be a lowercase 40-character commit SHA');
+  }
+  if (!COMMIT_SHA_PATTERN.test(reviewedHeadSha)) {
+    throw new Error('REVIEWED_HEAD_SHA must be a lowercase 40-character commit SHA');
+  }
+
+  let currentPullRequest;
+  try {
+    currentPullRequest = await github.rest.pulls.get({
+      owner: context.repo.owner,
+      repo: context.repo.repo,
+      pull_number: pr.number,
+    });
+  } catch (error) {
+    core.warning(`Could not verify the current pull request head: ${error.message}`);
+    await createIssueComment({
+      github,
+      context,
+      core,
+      body: `Codex review completed, but the current pull request head could not be verified, so no review was posted. Workflow run: ${runUrl}`,
+    });
+    core.setFailed('Could not verify the current pull request head before posting the Codex review.');
+    return;
+  }
+
+  const currentHeadSha = currentPullRequest.data?.head?.sha;
+  const currentBaseSha = currentPullRequest.data?.base?.sha;
+  if (currentHeadSha !== reviewedHeadSha) {
+    core.warning(`Codex reviewed ${reviewedHeadSha}, but the pull request head is now ${currentHeadSha || 'unknown'}.`);
+    await createIssueComment({
+      github,
+      context,
+      core,
+      body: `Codex reviewed commit ${reviewedHeadSha.slice(0, 12)}, but the pull request head changed before the review could be posted. Reapply the review label to review the current head. Workflow run: ${runUrl}`,
+    });
+    return;
+  }
+  if (currentBaseSha !== reviewedBaseSha) {
+    core.warning(`Codex reviewed base ${reviewedBaseSha}, but the pull request base is now ${currentBaseSha || 'unknown'}.`);
+    await createIssueComment({
+      github,
+      context,
+      core,
+      body: `Codex reviewed against base commit ${reviewedBaseSha.slice(0, 12)}, but the pull request base changed before the review could be posted. Reapply the review label to review the current base. Workflow run: ${runUrl}`,
     });
     return;
   }
@@ -618,7 +749,7 @@ module.exports = async function postReview({ github, context, core }) {
     }
   }
 
-  const body = buildReviewBody(review, unplaced, comments.length);
+  const body = buildReviewBody(review, unplaced, comments.length, reviewedBaseSha);
   const event = reviewEventForSeverity(review.highest_severity);
 
   core.info(`Codex review: placing ${comments.length} inline ${pluralize(comments.length, 'comment')}, ${unplaced.length} unplaced, event=${event}.`);
@@ -629,6 +760,7 @@ module.exports = async function postReview({ github, context, core }) {
       owner: context.repo.owner,
       repo: context.repo.repo,
       pull_number: pr.number,
+      commit_id: reviewedHeadSha,
       body,
       event,
       comments,
@@ -651,11 +783,12 @@ module.exports = async function postReview({ github, context, core }) {
     // (skipping the cleanup below), again leaving any previous review in place.
     if (error.status === 422 && comments.length > 0) {
       core.warning(`GitHub rejected the inline comments (422): ${error.message}. Retrying without inline comments.`);
-      const fallbackBody = buildReviewBody(review, [...unplaced, ...placedFindings], 0);
+      const fallbackBody = buildReviewBody(review, [...unplaced, ...placedFindings], 0, reviewedBaseSha);
       created = await github.rest.pulls.createReview({
         owner: context.repo.owner,
         repo: context.repo.repo,
         pull_number: pr.number,
+        commit_id: reviewedHeadSha,
         body: fallbackBody,
         event,
         comments: [],
@@ -670,17 +803,25 @@ module.exports = async function postReview({ github, context, core }) {
   // (keeping the one just created), then supersede earlier reviews. Dismissing first risked removing
   // a previous blocking review and then failing to post the replacement, silently unblocking the PR.
   await deletePreviousCodexInlineComments({ github, context, core, keepReviewId: created?.data?.id });
-  await dismissPreviousCodexReviews({ github, context, core, runUrl });
+  await dismissPreviousCodexReviews({
+    github,
+    context,
+    core,
+    runUrl,
+    keepReviewId: created?.data?.id,
+  });
 };
 
 // Exported for unit testing. The workflow only calls the default postReview export; these named
 // helpers are attached so their logic can be exercised in isolation (see post-review.test.js).
 module.exports.parsePatchLines = parsePatchLines;
 module.exports.resolveReviewOutputPath = resolveReviewOutputPath;
+module.exports.readReviewOutput = readReviewOutput;
 module.exports.validateReview = validateReview;
 module.exports.expectedHighestSeverity = expectedHighestSeverity;
 module.exports.countFindingsBySeverity = countFindingsBySeverity;
 module.exports.buildReviewBody = buildReviewBody;
+module.exports.formatInlineCommentBody = formatInlineCommentBody;
 module.exports.reviewEventForSeverity = reviewEventForSeverity;
 module.exports.isDismissableCodexReview = isDismissableCodexReview;
 module.exports.CODEX_REVIEW_MARKER = CODEX_REVIEW_MARKER;

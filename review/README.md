@@ -20,7 +20,7 @@ Add this wrapper workflow to each consuming repository:
 name: Codex Review
 
 on:
-  pull_request:
+  pull_request_target:
     types: [labeled]
 
 permissions:
@@ -46,9 +46,13 @@ or commit SHA when using this outside early rollout.
 
 - Configure `OPENAI_API_KEY` as a repository secret or as an organization secret
   scoped to selected repositories.
-- Keep GitHub Actions approval for outside collaborators enabled in public repos.
 - Ensure only trusted users can apply the `codex-review` label.
 - Create the `codex-review` label in each consuming repository.
+- Keep the `pull_request_target` wrapper limited to the reusable-workflow call
+  shown above. Do not add steps that check out or execute pull request code.
+- Run the workflow on GitHub.com. It relies on the reusable-workflow identity
+  fields `job.workflow_repository` and `job.workflow_sha`, which are not
+  available on GitHub Enterprise Server.
 - Confirm the repository or organization allows the required `GITHUB_TOKEN`
   permissions: `actions: read`, `contents: read`, `issues: write`, and
   `pull-requests: write`.
@@ -85,42 +89,58 @@ the PR title and body, `plugin.json`, and any `AGENTS.md`/`.codex`-style agent
 instruction files. It assumes an attacker may open a PR (or push a branch) for
 the sole purpose of making the reviewer leak a secret or take an unwanted action.
 
-The reason this is safe to use is that no single control is load-bearing: the two
-secrets in play (`OPENAI_API_KEY` and the `GITHUB_TOKEN`) are kept away from the
-agent by several independent layers, and the agent runs sandboxed and read-only
-even if a layer were bypassed. The controls below are grouped by the risk they
-address.
+The design does not rely on a single control: the two secrets in play
+(`OPENAI_API_KEY` and the `GITHUB_TOKEN`) are separated from the agent by
+several independent layers, and the agent runs sandboxed and read-only. The
+controls below are grouped by the risk they address.
 
 ### Who can trigger a review
 
-- The caller wrapper runs **only** on `pull_request` `labeled` events where the
-  label is `codex-review`, so an ordinary push never starts a review.
+- The caller wrapper runs **only** on trusted `pull_request_target` `labeled`
+  events where the label is `codex-review`, so an ordinary push never starts a
+  review. The wrapper itself never checks out or executes pull request code.
 - Applying that label is the trust decision. Restrict who can label PRs in each
   consuming repository (see *Required Repository Setup*).
-- The called workflow refuses to use the OpenAI key unless the repository owner
-  is in `allowed-owners` (default `matomo-org,innocraft`); a fork of this
-  workflow under another owner cannot run it.
-- **Fork PRs are skipped before Codex runs.** GitHub withholds repository and
-  organization secrets from fork-triggered runs, so a fork could never
-  authenticate anyway; the preflight detects `head repo != base repo` and exits
-  with an explanatory message rather than failing later on an empty key. This
-  also means untrusted contributor code only ever reaches Codex after a
-  maintainer with label rights has pulled it into a branch of the repo itself.
+- The called workflow refuses to use the OpenAI key unless the caller repository
+  owner is in `allowed-owners` (default `matomo-org,innocraft`). This prevents
+  accidental use by repositories outside the intended organizations.
+- **Fork PRs are skipped before any PR checkout or Codex step.** The trusted
+  `pull_request_target` context lets the posting and cleanup jobs explain the
+  skip and remove the trigger label, while preflight compares immutable numeric
+  base/head repository IDs before fork code reaches the runner. Missing or
+  mismatched IDs fail closed. This means untrusted contributor code only reaches
+  Codex after a maintainer with label rights has pulled it into a branch of the
+  repository itself.
 
 ### The agent runs trusted code against an untrusted target
 
-- The review scripts, prompt, and JSON schema are checked out from **this**
-  shared workflow repository at `job.workflow_sha` (the pinned trusted commit),
-  never from the caller/PR. A PR that edits `review/*` cannot change what
-  actually executes.
+- The preflight module, review scripts, prompt, and JSON schema are checked out
+  from **this** shared workflow repository at `job.workflow_sha` (the pinned
+  trusted commit), never from the caller/PR. A PR that edits `review/*` cannot
+  change what actually executes, and the security-sensitive preflight logic is
+  covered by the same Node test suite as review posting.
 - External GitHub Actions used by the trusted workflow are pinned by full commit
   SHA so tag retargeting cannot silently change what privileged jobs execute.
-- The PR is checked out into a separate `pr/` directory that is only ever the
-  *target* of read-only inspection — it is not a source of executable workflow
-  logic.
+- The event's exact PR head SHA is checked out into a separate `pr/` directory
+  that is only ever the *target* of read-only inspection. It is not a source of
+  executable workflow logic.
+- Preflight confirms the live PR repository identity, base, and head still match
+  the labeled event, derives changed paths from that frozen base/head diff, and
+  passes the same SHAs to checkout, the prompt, and review posting. Posting
+  checks both SHAs again and supplies GitHub's head `commit_id`, so a later head
+  push or base-branch advance cannot be presented as reviewed by an earlier run.
+- Every posted review carries a trusted hidden base-SHA marker. A prior review
+  suppresses a duplicate run only when both its head commit and recorded base
+  commit match the newly labeled snapshot; legacy or malformed markers default
+  to a fresh review.
 - As defense in depth, a PR that touches reviewer automation paths
   (`.github/workflows/codex-review.yml`, `.github/codex/`, configurable via
-  `automation-paths`) is skipped and flagged for human review first.
+  `automation-paths`) is skipped and flagged for human review first. Preflight
+  uses `git diff --no-renames`, so renaming a guarded file out of a guarded path
+  still reports and blocks the deleted source path.
+- Changed-path JSON is bounded before it becomes a job output. An exceptionally
+  large path list fails closed instead of overflowing GitHub's output channel or
+  being truncated into an incomplete review scope.
 - The plugin name read from the untrusted `plugin.json` is validated against
   `^[A-Za-z0-9_]+$` before it is used in a filesystem path or written to a step
   output, preventing path traversal and step-output injection.
@@ -132,10 +152,9 @@ address.
   cannot write code, comments, or labels.
 - Every checkout, including the PR, uses `persist-credentials: false`, so no
   `GITHUB_TOKEN` is left in `pr/.git/config` for the agent to harvest.
-- The one place the token is still needed — fetching the base and head refs so
-  the diff can be computed — supplies it through an **in-memory**
-  `git -c http.extraheader` that is never written to disk. After that step the
-  working tree Codex reads contains no credential material.
+- The frozen PR checkout uses `fetch-depth: 0`, so the base commit needed for
+  the explicit SHA diff is present without a later authenticated fetch. After
+  checkout, the working tree Codex reads contains no credential material.
 - Codex's shell runs under an environment policy that strips secret-bearing
   variables (`*KEY*`, `*SECRET*`, `*TOKEN*`, `GITHUB_*`, `ACTIONS_*`, `OPENAI_*`,
   `CODEX_*`). Even a prompt-injected command cannot echo the OpenAI key or the
@@ -171,6 +190,14 @@ address.
   `issues: write` / `pull-requests: write` permissions and turns that validated
   output into the GitHub review. The component that writes to the PR is not the
   component exposed to untrusted input.
+- Posting revalidates every required property and rejects unknown properties,
+  non-regular files, files outside the downloaded artifact directory, and
+  output larger than 1 MiB before parsing or making a review mutation.
+- Model-authored GitHub user/team mentions are neutralized before public
+  posting. Untrusted filenames and rule names are rendered as bounded code spans
+  with control and direction-changing characters made visible.
+- Public review bodies are capped at 60,000 characters. Findings that do not fit
+  remain available in the seven-day `codex-review-output` diagnostics artifact.
 
 ## Inputs
 
@@ -183,7 +210,7 @@ address.
 | `matomo-core-repository` | no | `matomo-org/matomo` | Matomo core repository used for read-only review context. |
 | `matomo-core-ref` | no | `5.x-dev` | Matomo core ref used for read-only review context. |
 | `plugin-name` | no | read from `plugin.json` | Plugin name used for the optional core-layout mapping. |
-| `codex-model` | no | `gpt-5.5` | OpenAI model passed to `openai/codex-action`. Override only to move off the default. |
+| `codex-model` | no | `gpt-5.6-sol` | OpenAI model passed to `openai/codex-action`. Override only to move off the default. |
 | `codex-effort` | no | `xhigh` | Reasoning effort passed to `openai/codex-action` (`minimal`, `low`, `medium`, `high`, or `xhigh`). |
 
 ## Secrets
@@ -191,3 +218,16 @@ address.
 | Secret | Required | Description |
 | --- | --- | --- |
 | `OPENAI_API_KEY` | yes | OpenAI API key passed from the consuming repository or organization secret. |
+
+## Local Validation
+
+Run the dependency-free Node test suite after changing the workflow, prompt,
+schema, or trusted review scripts:
+
+```bash
+npm test
+```
+
+CI runs the same suite on Node.js 22. The tests include cross-file workflow and
+documentation invariants in addition to preflight, rendering, schema, and
+posting edge cases.
