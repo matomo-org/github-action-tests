@@ -30,6 +30,15 @@ jobs:
     name: PHPCS
     runs-on: ubuntu-24.04
     steps:
+      - name: Validate inputs
+        env:
+          PLUGIN_NAME: ${{ inputs.plugin-name }}
+        run: |
+          if [[ ! "$PLUGIN_NAME" =~ ^[A-Za-z0-9_]+$ ]]; then
+            echo "Invalid plugin-name: $PLUGIN_NAME"
+            exit 1
+          fi
+
       - uses: actions/checkout@v4
         with:
           lfs: false
