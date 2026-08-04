@@ -17,6 +17,11 @@ on:
         required: false
         type: string
         default: '7.2'
+      scripts-ref:
+        description: "Ref of matomo-org/github-action-tests to take the helper scripts from. When pinning the workflow to a SHA, pass the same SHA here."
+        required: false
+        type: string
+        default: 'main'
       verify-hook:
         description: "Fail when the plugin's .git-hooks-matomo/pre-push differs from the canonical copy in this repository"
         required: false
@@ -55,19 +60,14 @@ jobs:
         with:
           php-version: ${{ inputs.php-version }}
 
-      # TODO(smoke): if the debug step below prints a SHA, pin ref to
-      # github.job_workflow_sha so the caller's pin governs the scripts too.
-      - name: Debug reusable workflow contexts
-        run: |
-          echo "github.job_workflow_sha='${{ github.job_workflow_sha }}'"
-          echo "github.workflow_ref='${{ github.workflow_ref }}'"
-          echo "github.workflow_sha='${{ github.workflow_sha }}'"
-
+      # No GitHub context identifies the called workflow's own commit (verified
+      # empirically: github.job_workflow_sha evaluates to empty), so pinning the
+      # scripts is the caller's job via scripts-ref.
       - name: Check out github-action-tests repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           repository: matomo-org/github-action-tests
-          ref: PG-4897-shared-phpstan
+          ref: ${{ inputs.scripts-ref }}
           path: github-action-tests
           persist-credentials: false
 

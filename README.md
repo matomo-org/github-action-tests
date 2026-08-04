@@ -178,8 +178,8 @@ jobs:
 
 The example uses `@main` to match how plugin repositories currently consume this repository's
 scripts. For immutability, pin the `uses:` reference to a full commit SHA — release tags stay
-mutable unless the repository enforces immutable releases. The workflow checks out its helper
-scripts at its own resolved commit, so the caller's pin governs everything that runs.
+mutable unless the repository enforces immutable releases — and pass the same SHA as
+`scripts-ref`, which the workflow uses to check out its helper scripts (default: `main`).
 
 ## Git hooks (`hooks/`)
 
