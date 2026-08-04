@@ -186,3 +186,11 @@ jobs:
   AiChecklist:
     uses: matomo-org/github-action-tests/.github/workflows/plugin-ai-checklist.yml@main
 ```
+
+Both examples use `@main` to match how plugin repositories currently consume this repository.
+For immutability, pin the `uses:` reference to a full commit SHA — release tags stay mutable
+unless the repository enforces immutable releases:
+
+```yaml
+    uses: matomo-org/github-action-tests/.github/workflows/plugin-phpcs.yml@<full commit SHA>
+```
