@@ -9,14 +9,13 @@ else
   echo ""
   PLUGINS=($DEPENDENT_PLUGINS)
   for pluginSlug in ${PLUGINS[@]}; do
-    dependentPluginName=$(echo "$pluginSlug" | sed -E 's/[a-zA-Z0-9_-]+\/[a-zA-Z0-9_]+-(.*)/\1/')
-
-    # A plugin name is strictly alphanumeric; anything else (including a slug the
-    # sed above passed through unchanged) could traverse out of plugins/ below.
-    if [[ ! "$dependentPluginName" =~ ^[A-Za-z0-9_]+$ ]]; then
+    # Both documented repository forms: owner/PluginName and owner/plugin-PluginName.
+    # The strict plugin-name charset keeps the derived path inside plugins/ below.
+    if [[ ! "$pluginSlug" =~ ^[A-Za-z0-9_.-]+/(plugin-)?([A-Za-z0-9_]+)$ ]]; then
         echo "Skipping invalid dependent plugin slug: $pluginSlug"
         continue
     fi
+    dependentPluginName="${BASH_REMATCH[2]}"
 
     echo "Cloning $pluginSlug into plugins/$dependentPluginName..."
 
