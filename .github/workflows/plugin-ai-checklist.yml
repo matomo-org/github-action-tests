@@ -22,4 +22,4 @@ jobs:
       fail-fast: false
     steps:
       - name: Run tests
-        uses: matomo-org/github-action-checklist-gate@main
+        uses: matomo-org/github-action-checklist-gate@d5f101a2538ef30ddb3b06cc366f852c9851b588 # main as of 2026-08-04

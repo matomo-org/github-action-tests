@@ -154,3 +154,35 @@ This action is able to run certain test suites for Matomo or any Matomo plugin.
           dependent-plugins: 'slug/plugin-AdditionalPlugin'
           github-token: ${{ secrets.TESTS_ACCESS_TOKEN || secrets.GITHUB_TOKEN }}
 ```
+
+### PHPCS (`.github/workflows/plugin-phpcs.yml`)
+
+Runs the plugin's own `phpcs.xml` against the matomo-coding-standards ruleset. Inputs:
+`plugin-name` (required), `php-version` (optional, default `7.4`).
+
+```yaml
+name: PHPCS check
+on: pull_request
+jobs:
+  phpcs:
+    uses: matomo-org/github-action-tests/.github/workflows/plugin-phpcs.yml@main
+    with:
+      plugin-name: MyPlugin
+```
+
+### AI Checklist (`.github/workflows/plugin-ai-checklist.yml`)
+
+Runs the org's checklist gate against the pull request description. No inputs.
+
+```yaml
+name: AI Checklist
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  AiChecklist:
+    uses: matomo-org/github-action-tests/.github/workflows/plugin-ai-checklist.yml@main
+```
