@@ -154,3 +154,23 @@ This action is able to run certain test suites for Matomo or any Matomo plugin.
           dependent-plugins: 'slug/plugin-AdditionalPlugin'
           github-token: ${{ secrets.TESTS_ACCESS_TOKEN || secrets.GITHUB_TOKEN }}
 ```
+
+### License check (`.github/workflows/plugin-license-check.yml`)
+
+Checks that the repository ships a `LICENSE` file matching the license declared in
+`plugin.json`, and that source files (`*.php`, `*.js`, `*.ts`, `*.vue`) carry the matching
+license header: the GPL header for OSS plugins, the InnoCraft EULA header for premium ones.
+A file carrying the opposite header fails the check; files with no recognized header are
+reported as warnings. Inputs: `fail-on-missing-header` (optional, default `false`) turns
+those warnings into errors; `script-ref` (optional, default `main`) selects the ref of this
+repository to take the check script from. Glob patterns in a `.license-check-ignore` file
+at the repository root are skipped, e.g. for bundled third-party files under their own
+license.
+
+```yaml
+name: License check
+on: pull_request
+jobs:
+  license-check:
+    uses: matomo-org/github-action-tests/.github/workflows/plugin-license-check.yml@main
+```

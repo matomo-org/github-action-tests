@@ -1,0 +1,46 @@
+name: License check
+
+on:
+  workflow_call:
+    inputs:
+      fail-on-missing-header:
+        description: "Treat source files without any recognized license header as errors instead of warnings"
+        required: false
+        type: boolean
+        default: false
+      script-ref:
+        description: "Ref of matomo-org/github-action-tests to take the check script from"
+        required: false
+        type: string
+        default: 'main'
+
+# The job only reads the repository; everything else stays at none so any caller
+# with default workflow permissions can use this without granting scopes.
+permissions:
+  contents: read
+
+jobs:
+  license-check:
+    name: License check
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          lfs: false
+          persist-credentials: false
+      - name: Check out the license check script
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          repository: matomo-org/github-action-tests
+          ref: ${{ inputs.script-ref }}
+          path: .github-action-tests
+          persist-credentials: false
+      - name: Run license check
+        env:
+          FAIL_ON_MISSING_HEADER: ${{ inputs.fail-on-missing-header }}
+        run: |
+          # Move the script out of the workspace so its own checkout
+          # directory is not scanned as part of the plugin.
+          cp .github-action-tests/scripts/bash/license_check.sh "$RUNNER_TEMP/"
+          rm -rf .github-action-tests
+          bash "$RUNNER_TEMP/license_check.sh" .
