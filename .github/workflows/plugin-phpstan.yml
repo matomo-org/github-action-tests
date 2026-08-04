@@ -101,7 +101,7 @@ jobs:
 
       - name: PHPStan whole repo
         id: phpstan-all
-        run: cd ${{ github.workspace }}/matomo && composer run phpstan -- -vvv -c plugins/${{ env.PLUGIN_NAME }}/phpstan.neon
+        run: cd ${{ github.workspace }}/matomo && composer run phpstan -- -vvv -c "plugins/${PLUGIN_NAME}/phpstan.neon"
 
       - name: "Save result cache"
         uses: actions/cache/save@v4
