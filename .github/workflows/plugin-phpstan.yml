@@ -1,0 +1,111 @@
+name: PHPStan check
+
+on:
+  workflow_call:
+    inputs:
+      plugin-name:
+        description: "Name of the plugin, e.g. LoginLdap"
+        required: true
+        type: string
+      dependent-plugins:
+        description: "Space-separated repository slugs to check out, e.g. 'innocraft/plugin-Funnels'"
+        required: false
+        type: string
+        default: ''
+      php-version:
+        description: "PHP version the job runs on; the analysis level and phpVersion come from the plugin's phpstan.neon"
+        required: false
+        type: string
+        default: '7.2'
+      verify-hook:
+        description: "Fail when the plugin's .git-hooks-matomo/pre-push differs from the canonical copy in this repository"
+        required: false
+        type: boolean
+        default: true
+    secrets:
+      TESTS_ACCESS_TOKEN:
+        required: false
+
+permissions:
+  actions: read
+  checks: read
+  contents: read
+  deployments: none
+  issues: read
+  packages: none
+  pull-requests: read
+  repository-projects: none
+  security-events: none
+  statuses: read
+
+jobs:
+  phpstan:
+    name: PHPStan
+    runs-on: ubuntu-latest
+    env:
+      PLUGIN_NAME: ${{ inputs.plugin-name }}
+      DEPENDENT_PLUGINS: ${{ inputs.dependent-plugins }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: false
+          persist-credentials: false
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ inputs.php-version }}
+
+      - name: Check out github-action-tests repository
+        uses: actions/checkout@v4
+        with:
+          repository: matomo-org/github-action-tests
+          ref: main
+          path: github-action-tests
+          persist-credentials: false
+
+      - name: Check the pre-push hook matches the canonical copy
+        if: ${{ inputs.verify-hook }}
+        shell: bash
+        run: diff -u github-action-tests/hooks/pre-push .git-hooks-matomo/pre-push
+
+      - name: checkout matomo for plugin builds
+        shell: bash
+        run: ${{ github.workspace }}/github-action-tests/scripts/bash/checkout_matomo.sh
+        env:
+          WORKSPACE: ${{ github.workspace }}
+          ACTION_PATH: ${{ github.workspace }}/github-action-tests
+          MATOMO_TEST_TARGET: maximum_supported_matomo
+
+      - name: prepare setup
+        shell: bash
+        run: |
+          cd ${{ github.workspace }}/matomo
+          echo -e "composer install"
+          composer install --ignore-platform-reqs
+
+      - name: checkout additional plugins
+        if: ${{ inputs.dependent-plugins != '' }}
+        shell: bash
+        working-directory: ${{ github.workspace }}/matomo
+        run: ${{ github.workspace }}/github-action-tests/scripts/bash/checkout_dependent_plugins.sh
+        env:
+          GITHUB_USER_TOKEN: ${{ secrets.TESTS_ACCESS_TOKEN || github.token }}
+
+      - name: "Restore result cache"
+        uses: actions/cache/restore@v4
+        with:
+          path: /tmp/phpstan # same as in phpstan.neon
+          key: "phpstan-result-cache-${{ github.run_id }}"
+          restore-keys: |
+            phpstan-result-cache-
+
+      - name: PHPStan whole repo
+        id: phpstan-all
+        run: cd ${{ github.workspace }}/matomo && composer run phpstan -- -vvv -c plugins/${{ env.PLUGIN_NAME }}/phpstan.neon
+
+      - name: "Save result cache"
+        uses: actions/cache/save@v4
+        if: ${{ !cancelled() }}
+        with:
+          path: /tmp/phpstan # same as in phpstan.neon
+          key: "phpstan-result-cache-${{ github.run_id }}"
