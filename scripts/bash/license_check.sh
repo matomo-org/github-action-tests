@@ -14,9 +14,12 @@ set -euo pipefail
 REPO_ROOT="${1:-.}"
 FAIL_ON_MISSING_HEADER="${FAIL_ON_MISSING_HEADER:-0}"
 
-PREMIUM_MARKER='Copyright (C) InnoCraft Ltd'
+# Anchored to a comment line — bare or "*"-prefixed, covering both block and
+# HTML comments — so marker text inside code or string literals does not count
+# as a header.
+PREMIUM_MARKER='^[[:space:]]*(\*[[:space:]]*)?Copyright \(C\) InnoCraft Ltd - All rights reserved\.'
 # Matches both the http and https URL variants in use across plugins.
-OSS_MARKER='gnu\.org/licenses/gpl-3\.0'
+OSS_MARKER='^[[:space:]]*(\*[[:space:]]*)?@license[[:space:]]+https?://(www\.)?gnu\.org/licenses/gpl-3\.0'
 # Only the start of a file counts as its header; a byte window rather than a
 # line count so minified single-line bundles are still covered.
 HEADER_WINDOW_BYTES=2048
@@ -114,7 +117,7 @@ while IFS= read -r -d '' file; do
   header=$(head -c "$HEADER_WINDOW_BYTES" -- "$file")
   has_premium=0
   has_oss=0
-  if grep -qF "$PREMIUM_MARKER" <<< "$header"; then has_premium=1; fi
+  if grep -qE "$PREMIUM_MARKER" <<< "$header"; then has_premium=1; fi
   if grep -qE "$OSS_MARKER" <<< "$header"; then has_oss=1; fi
 
   if [ "$repo_type" = premium ]; then
