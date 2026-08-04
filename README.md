@@ -172,7 +172,8 @@ jobs:
       plugin-name: MyPlugin
       # dependent-plugins: 'innocraft/plugin-Funnels'
       # php-version: '8.2'
-    secrets: inherit
+    secrets:
+      TESTS_ACCESS_TOKEN: ${{ secrets.TESTS_ACCESS_TOKEN }}
 ```
 
 ## Git hooks (`hooks/`)

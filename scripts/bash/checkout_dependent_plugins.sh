@@ -11,7 +11,10 @@ else
   for pluginSlug in ${PLUGINS[@]}; do
     dependentPluginName=$(echo "$pluginSlug" | sed -E 's/[a-zA-Z0-9_-]+\/[a-zA-Z0-9_]+-(.*)/\1/')
 
-    if [ "$dependentPluginName" == "" ]; then
+    # A plugin name is strictly alphanumeric; anything else (including a slug the
+    # sed above passed through unchanged) could traverse out of plugins/ below.
+    if [[ ! "$dependentPluginName" =~ ^[A-Za-z0-9_]+$ ]]; then
+        echo "Skipping invalid dependent plugin slug: $pluginSlug"
         continue
     fi
 
