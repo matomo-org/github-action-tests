@@ -40,8 +40,10 @@ jobs:
           php-version: ${{ inputs.php-version }}
           tools: cs2pr
       - name: Install dependencies
+        env:
+          PLUGIN_NAME: ${{ inputs.plugin-name }}
         run:
-          composer init --name=matomo/$(echo '${{ inputs.plugin-name }}' | tr '[:upper:]' '[:lower:]') --quiet;
+          composer init --name=matomo/$(echo "$PLUGIN_NAME" | tr '[:upper:]' '[:lower:]') --quiet;
           composer --no-plugins config allow-plugins.dealerdirect/phpcodesniffer-composer-installer true -n;
           composer config repositories.matomo-coding-standards vcs https://github.com/matomo-org/matomo-coding-standards -n;
           composer require matomo-org/matomo-coding-standards:dev-master;
