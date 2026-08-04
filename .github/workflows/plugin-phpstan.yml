@@ -62,11 +62,14 @@ jobs:
         with:
           php-version: ${{ inputs.php-version }}
 
+      # job.workflow_repository/job.workflow_sha resolve to this reusable workflow's
+      # own repo and commit, so the helper scripts are version-locked to whatever
+      # ref the caller pinned instead of floating on main.
       - name: Check out github-action-tests repository
         uses: actions/checkout@v4
         with:
-          repository: matomo-org/github-action-tests
-          ref: main
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
           path: github-action-tests
           persist-credentials: false
 

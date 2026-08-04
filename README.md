@@ -176,6 +176,10 @@ jobs:
       TESTS_ACCESS_TOKEN: ${{ secrets.TESTS_ACCESS_TOKEN }}
 ```
 
+Pinning the `uses:` reference to a commit SHA or release tag instead of `@main` makes the whole
+check immutable: the workflow checks out its helper scripts at its own resolved commit, so the
+caller's pin governs everything that runs.
+
 ## Git hooks (`hooks/`)
 
 `hooks/pre-push` is the canonical copy of the PHPStan pre-push hook that plugin repositories
