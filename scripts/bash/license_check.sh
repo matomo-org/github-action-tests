@@ -14,12 +14,11 @@ set -euo pipefail
 REPO_ROOT="${1:-.}"
 FAIL_ON_MISSING_HEADER="${FAIL_ON_MISSING_HEADER:-0}"
 
-# Anchored to a comment line — bare or "*"-prefixed, covering both block and
-# HTML comments — so marker text inside code or string literals does not count
-# as a header.
-PREMIUM_MARKER='^[[:space:]]*(\*[[:space:]]*)?Copyright \(C\) InnoCraft Ltd - All rights reserved\.'
+# Matched only against the leading comment block, so no line anchoring is
+# needed; code and string literals never enter the searched region.
+PREMIUM_MARKER='Copyright \(C\) InnoCraft Ltd - All rights reserved\.'
 # Matches both the http and https URL variants in use across plugins.
-OSS_MARKER='^[[:space:]]*(\*[[:space:]]*)?@license[[:space:]]+https?://(www\.)?gnu\.org/licenses/gpl-3\.0'
+OSS_MARKER='@license[[:space:]]+https?://(www\.)?gnu\.org/licenses/gpl-3\.0'
 # Only the start of a file counts as its header; a byte window rather than a
 # line count so minified single-line bundles are still covered.
 HEADER_WINDOW_BYTES=2048
@@ -42,6 +41,22 @@ report_missing_header() {
       warnings=$((warnings + 1))
       ;;
   esac
+}
+
+# A header is the contiguous comment run at the top of the file — after an
+# optional <?php line and blank lines — in //, /* */, or <!-- --> form.
+# Anything from the first code line on is not a header.
+extract_header_comments() {
+  sed '1s/^\xEF\xBB\xBF//' | awk '
+    in_block == 1 { print; if (index($0, "*/")) in_block = 0; next }
+    in_block == 2 { print; if (index($0, "-->")) in_block = 0; next }
+    /^[[:space:]]*$/ { next }
+    /^<\?php[[:space:]]*$/ { next }
+    /^[[:space:]]*\/\// { print; next }
+    /^[[:space:]]*\/\*/ { print; if (!index(substr($0, index($0, "/*") + 2), "*/")) in_block = 1; next }
+    /^[[:space:]]*<!--/ { print; if (!index(substr($0, index($0, "<!--") + 4), "-->")) in_block = 2; next }
+    { exit }
+  '
 }
 
 cd "$REPO_ROOT"
@@ -78,10 +93,20 @@ done
 
 if [ -z "$license_file" ]; then
   report_error LICENSE 'No LICENSE or LICENSE.md file found at the repository root'
-elif [ "$repo_type" = premium ] && ! grep -qi 'InnoCraft' "$license_file"; then
-  report_error "$license_file" 'plugin.json declares the InnoCraft EULA but the license file does not mention InnoCraft'
-elif [ "$repo_type" = oss ] && ! grep -qi 'GNU GENERAL PUBLIC LICENSE' "$license_file"; then
-  report_error "$license_file" 'plugin.json declares a GPL license but the license file is not the GPL'
+elif [ "$repo_type" = premium ]; then
+  if ! grep -qi 'InnoCraft' "$license_file"; then
+    report_error "$license_file" 'plugin.json declares the InnoCraft EULA but the license file does not mention InnoCraft'
+  elif grep -qi 'GNU GENERAL PUBLIC LICENSE' "$license_file"; then
+    report_error "$license_file" 'plugin.json declares the InnoCraft EULA but the license file contains the GPL'
+  fi
+else
+  if ! grep -qi 'GNU GENERAL PUBLIC LICENSE' "$license_file"; then
+    report_error "$license_file" 'plugin.json declares a GPL license but the license file is not the GPL'
+  # "InnoCraft EULA" rather than "InnoCraft": a GPL license file may carry a
+  # legitimate InnoCraft copyright line.
+  elif grep -qi 'InnoCraft EULA' "$license_file"; then
+    report_error "$license_file" 'plugin.json declares a GPL license but the license file contains the InnoCraft EULA'
+  fi
 fi
 
 ignore_patterns=()
@@ -114,7 +139,7 @@ while IFS= read -r -d '' file; do
   fi
   scanned=$((scanned + 1))
 
-  header=$(head -c "$HEADER_WINDOW_BYTES" -- "$file")
+  header=$(head -c "$HEADER_WINDOW_BYTES" -- "$file" | extract_header_comments)
   has_premium=0
   has_oss=0
   if grep -qE "$PREMIUM_MARKER" <<< "$header"; then has_premium=1; fi
