@@ -3,17 +3,11 @@ name: AI Checklist
 on:
   workflow_call: {}
 
+# The gate reads the pull request description; callers must grant these two
+# scopes in their own permissions block.
 permissions:
   actions: read
-  checks: none
-  contents: none
-  deployments: none
-  issues: none
-  packages: none
   pull-requests: read
-  repository-projects: none
-  security-events: none
-  statuses: none
 
 jobs:
   AiChecklist:

@@ -13,17 +13,10 @@ on:
         type: string
         default: '7.4'
 
+# The job only reads the repository; everything else stays at none so any caller
+# with default workflow permissions can use this without granting scopes.
 permissions:
-  actions: read
-  checks: read
   contents: read
-  deployments: none
-  issues: read
-  packages: none
-  pull-requests: read
-  repository-projects: none
-  security-events: none
-  statuses: read
 
 jobs:
   phpcs:

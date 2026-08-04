@@ -179,6 +179,9 @@ name: AI Checklist
 on:
   pull_request:
     types: [opened, synchronize, reopened, edited]
+permissions:
+  actions: read
+  pull-requests: read
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
