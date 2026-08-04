@@ -26,17 +26,10 @@ on:
       TESTS_ACCESS_TOKEN:
         required: false
 
+# The job only reads the two repositories; everything else stays at none so any
+# caller with default workflow permissions can use this without granting scopes.
 permissions:
-  actions: read
-  checks: read
   contents: read
-  deployments: none
-  issues: read
-  packages: none
-  pull-requests: read
-  repository-projects: none
-  security-events: none
-  statuses: read
 
 jobs:
   phpstan:
@@ -62,14 +55,19 @@ jobs:
         with:
           php-version: ${{ inputs.php-version }}
 
-      # job.workflow_repository/job.workflow_sha resolve to this reusable workflow's
-      # own repo and commit, so the helper scripts are version-locked to whatever
-      # ref the caller pinned instead of floating on main.
+      # TODO(smoke): if the debug step below prints a SHA, pin ref to
+      # github.job_workflow_sha so the caller's pin governs the scripts too.
+      - name: Debug reusable workflow contexts
+        run: |
+          echo "github.job_workflow_sha='${{ github.job_workflow_sha }}'"
+          echo "github.workflow_ref='${{ github.workflow_ref }}'"
+          echo "github.workflow_sha='${{ github.workflow_sha }}'"
+
       - name: Check out github-action-tests repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
-          repository: ${{ job.workflow_repository }}
-          ref: ${{ job.workflow_sha }}
+          repository: matomo-org/github-action-tests
+          ref: PG-4897-shared-phpstan
           path: github-action-tests
           persist-credentials: false
 
