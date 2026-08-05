@@ -9,7 +9,7 @@ on:
         type: boolean
         default: false
       script-ref:
-        description: "Ref of matomo-org/github-action-tests to take the check script from"
+        description: "Ref of matomo-org/github-action-tests to take the check script from. When pinning the workflow to a SHA, pass the same SHA here."
         required: false
         type: string
         default: 'main'
@@ -28,6 +28,9 @@ jobs:
         with:
           lfs: false
           persist-credentials: false
+      # No GitHub context identifies the called workflow's own commit (verified
+      # empirically: github.job_workflow_sha evaluates to empty), so pinning the
+      # script is the caller's job via script-ref.
       - name: Check out the license check script
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
