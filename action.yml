@@ -202,6 +202,12 @@ runs:
           matomo5_max_php)
             RESOLVED_VERSION="8.5"
             ;;
+          matomo6_min_php)
+            RESOLVED_VERSION="8.1"
+            ;;
+          matomo6_max_php)
+            RESOLVED_VERSION="8.5"
+            ;;
           '')
             exit 0
             ;;
