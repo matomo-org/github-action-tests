@@ -110,6 +110,13 @@ This action is able to run certain test suites for Matomo or any Matomo plugin.
 
     For security reasons this option should not be provided in plain text, but using a repository secret instead.
 
+  * **skip-generated-checks**
+
+    Before running plugin integration tests, this action generates compatibility checks into the plugin's test directory that compile the plugin's stylesheets and templates against the Matomo version under test. That catches a plugin using a core Less mixin or Twig function newer than the minimum Matomo its plugin.json declares, which would otherwise only surface once users on an older Matomo install the release.
+
+    Set this to true to skip generating them. This is an escape hatch, not a way to keep a real incompatibility unfixed: the two valid fixes are to stop using the newer core API, or to raise the required Matomo version in plugin.json.
+
+
   * **setup-script**
 
     This option can contain the path to a bash script that should be executed before running the tests.

@@ -75,15 +75,12 @@ class GeneratedTwigCompilationTest extends IntegrationTestCase
                 continue;
             }
 
-            $name = str_replace('\\', '/', substr($file->getPathname(), strlen($templateDir) + 1));
-
-            // templates/plugins/<Other>/ holds theme overrides that are registered under the
-            // other plugin's namespace, so they are not this plugin's to compile
-            if (strpos($name, 'plugins/') === 0) {
-                continue;
-            }
-
-            $names[] = $name;
+            // theme overrides under templates/plugins/<Other>/ are included: the plugin's own
+            // namespace is rooted at templates/, so this reaches the override file itself. Their
+            // registered namespace is only added for the theme that is currently enabled, which
+            // the plugin under test is not, so addressing them that way would compile the
+            // overridden plugin's copy instead of the file shipped here.
+            $names[] = str_replace('\\', '/', substr($file->getPathname(), strlen($templateDir) + 1));
         }
 
         sort($names);
