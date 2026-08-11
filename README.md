@@ -53,7 +53,7 @@ This action is able to run certain test suites for Matomo or any Matomo plugin.
 
     Defines the PHP version to set up for testing. (Not needed for Client tests)
 
-    Use `matomo5_min_php` or `matomo5_max_php` to resolve to the centrally managed (defined in action.yml) minimum or maximum PHP versions supported by Matomo tests.
+    Use `matomo5_min_php`, `matomo5_max_php`, `matomo6_min_php` or `matomo6_max_php` to resolve to the centrally managed minimum or maximum PHP versions supported by Matomo tests. The alias table is `scripts/bash/resolve_php_version.sh`, shared with the reusable PHPStan workflow so the two cannot drift apart.
 
     The action uses `shivammathur/setup-php` to set up PHP. You can find supported PHP versions here: https://github.com/shivammathur/setup-php#tada-php-support
 
@@ -171,7 +171,7 @@ jobs:
     with:
       plugin-name: MyPlugin
       # dependent-plugins: 'innocraft/plugin-Funnels'
-      # php-version: '8.2'
+      # php-version: matomo5_min_php   # or a literal version such as '8.2'
     secrets:
       TESTS_ACCESS_TOKEN: ${{ secrets.TESTS_ACCESS_TOKEN }}
 ```

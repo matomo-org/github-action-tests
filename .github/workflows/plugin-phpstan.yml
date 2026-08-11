@@ -13,10 +13,10 @@ on:
         type: string
         default: ''
       php-version:
-        description: "PHP version the job runs on; the analysis level and phpVersion come from the plugin's phpstan.neon"
+        description: "PHP version the job runs on; the analysis level and phpVersion come from the plugin's phpstan.neon. Accepts a literal version or one of the shared aliases (matomo5_min_php, matomo5_max_php, matomo6_min_php, matomo6_max_php), which track a Matomo major's floor and ceiling centrally."
         required: false
         type: string
-        default: '7.2'
+        default: 'matomo5_min_php'
       scripts-ref:
         description: "Ref of matomo-org/github-action-tests to take the helper scripts from. When pinning the workflow to a SHA, pass the same SHA here."
         required: false
@@ -64,14 +64,11 @@ jobs:
         with:
           lfs: false
           persist-credentials: false
-      - name: Setup PHP
-        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # 2.37.2
-        with:
-          php-version: ${{ inputs.php-version }}
 
       # No GitHub context identifies the called workflow's own commit (verified
       # empirically: github.job_workflow_sha evaluates to empty), so pinning the
-      # scripts is the caller's job via scripts-ref.
+      # scripts is the caller's job via scripts-ref. This runs before PHP is set up
+      # because the version aliases are resolved by one of those scripts.
       - name: Check out github-action-tests repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
@@ -79,6 +76,22 @@ jobs:
           ref: ${{ inputs.scripts-ref }}
           path: github-action-tests
           persist-credentials: false
+
+      - name: Resolve PHP version
+        id: resolve-php
+        shell: bash
+        env:
+          PHP_VERSION_INPUT: ${{ inputs.php-version }}
+        run: |
+          RESOLVED_VERSION=$("${{ github.workspace }}/github-action-tests/scripts/bash/resolve_php_version.sh" "$PHP_VERSION_INPUT")
+
+          echo "Resolved php-version '$PHP_VERSION_INPUT' to '$RESOLVED_VERSION'"
+          echo "version=$RESOLVED_VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # 2.37.2
+        with:
+          php-version: ${{ steps.resolve-php.outputs.version }}
 
       - name: Check the pre-push hook matches the canonical copy
         if: ${{ inputs.verify-hook }}
