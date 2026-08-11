@@ -22,7 +22,6 @@ use Piwik\Tests\Framework\TestCase\IntegrationTestCase;
  * mixin or variable that does not exist yet in the Matomo version under test fails here rather
  * than fatally on every page of an install running that version.
  *
- * @group {{PLUGIN_NAME}}
  * @group Plugins
  */
 class GeneratedAssetCompilationTest extends IntegrationTestCase

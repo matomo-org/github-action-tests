@@ -28,7 +28,6 @@ use Piwik\Tests\Framework\TestCase\IntegrationTestCase;
  * may therefore write the template engine's namespace with a space in front of it, which is why
  * the environment is built from an inline \Piwik\Twig below rather than an imported short name.
  *
- * @group {{PLUGIN_NAME}}
  * @group Plugins
  */
 class GeneratedTwigCompilationTest extends IntegrationTestCase
