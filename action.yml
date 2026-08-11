@@ -99,6 +99,11 @@ inputs:
     description: "Flag for whether to force uploading a report to Testomat.io instead of just push events. Only applies if the 'testomatio' token is set."
     required: false
     default: false
+  skip-generated-checks:
+    type: boolean
+    description: "If true, the compatibility checks this action generates into the plugin's integration tests are not written. Escape hatch only."
+    required: false
+    default: false
 
 runs:
   using: "composite"
@@ -331,6 +336,17 @@ runs:
       shell: bash
       run: sudo apt-get install ripgrep
       working-directory: ${{ github.workspace }}/matomo
+
+    - name: Generate plugin compatibility checks
+      if: inputs.plugin-name != ''
+      working-directory: ${{ github.workspace }}/matomo
+      shell: bash
+      run: ${{ github.action_path }}/scripts/bash/generate_compatibility_checks.sh
+      env:
+        TEST_SUITE: ${{ inputs.test-type }}
+        PLUGIN_NAME: ${{ inputs.plugin-name }}
+        ACTION_PATH: ${{ github.action_path }}
+        SKIP_GENERATED_CHECKS: ${{ inputs.skip-generated-checks }}
 
     - name: Run tests
       working-directory: ${{ github.workspace }}/matomo
