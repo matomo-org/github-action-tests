@@ -28,10 +28,15 @@ on:
         type: boolean
         default: true
       matomo-targets:
-        description: "JSON array of Matomo versions to analyse against. Analysing the minimum is what catches a plugin calling a core API that does not exist yet in the oldest Matomo its plugin.json supports. Pass a single-element array to analyse against one."
+        description: >-
+          JSON array of {target, php} objects, one per analysis run. Analysing the minimum target
+          is what catches a plugin calling a core API that does not exist yet in the oldest Matomo
+          its plugin.json supports. `php` is optional and falls back to the php-version input; set
+          it per target when the targets span Matomo majors, because a Matomo 6 checkout cannot be
+          bootstrapped by the PHP 7.2 that Matomo 5 allows.
         required: false
         type: string
-        default: '["minimum_required_matomo", "maximum_supported_matomo"]'
+        default: '[{"target": "minimum_required_matomo"}, {"target": "maximum_supported_matomo"}]'
     secrets:
       TESTS_ACCESS_TOKEN:
         required: false
@@ -43,12 +48,12 @@ permissions:
 
 jobs:
   phpstan:
-    name: PHPStan (${{ matrix.matomo-target }})
+    name: PHPStan (${{ matrix.target }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        matomo-target: ${{ fromJSON(inputs.matomo-targets) }}
+        include: ${{ fromJSON(inputs.matomo-targets) }}
     env:
       PLUGIN_NAME: ${{ inputs.plugin-name }}
       DEPENDENT_PLUGINS: ${{ inputs.dependent-plugins }}
@@ -81,7 +86,8 @@ jobs:
         id: resolve-php
         shell: bash
         env:
-          PHP_VERSION_INPUT: ${{ inputs.php-version }}
+          # per-target when the targets span Matomo majors, else the workflow-wide input
+          PHP_VERSION_INPUT: ${{ matrix.php || inputs.php-version }}
         run: |
           RESOLVED_VERSION=$("${{ github.workspace }}/github-action-tests/scripts/bash/resolve_php_version.sh" "$PHP_VERSION_INPUT")
 
@@ -104,7 +110,30 @@ jobs:
         env:
           WORKSPACE: ${{ github.workspace }}
           ACTION_PATH: ${{ github.workspace }}/github-action-tests
-          MATOMO_TEST_TARGET: ${{ matrix.matomo-target }}
+          MATOMO_TEST_TARGET: ${{ matrix.target }}
+
+      - name: Check the PHP version can bootstrap this Matomo
+        shell: bash
+        working-directory: ${{ github.workspace }}/matomo
+        env:
+          MATOMO_TARGET: ${{ matrix.target }}
+        run: |
+          # bootstrap-phpstan.php executes core rather than only parsing it, so analysing a
+          # Matomo 6 checkout under the PHP 7.2 that Matomo 5 allows dies on 8.1 syntax partway
+          # through. Catch it here, where the message can say what to change.
+          MATOMO_MIN_PHP=$(grep -oE "piwik_minimumPHPVersion = '[0-9.]+'" core/testMinimumPhpVersion.php | grep -oE "[0-9]+\.[0-9.]+" | head -1)
+
+          if [ -z "$MATOMO_MIN_PHP" ]; then
+            echo "Could not read piwik_minimumPHPVersion; skipping the compatibility check."
+            exit 0
+          fi
+
+          if ! php -r 'exit(version_compare(PHP_VERSION, $argv[1], ">=") ? 0 : 1);' "$MATOMO_MIN_PHP"; then
+            echo "::error::Matomo target '$MATOMO_TARGET' requires PHP >= $MATOMO_MIN_PHP but this job runs $(php -r 'echo PHP_VERSION;'). Give this target its own PHP in the matomo-targets input, for example {\"target\": \"$MATOMO_TARGET\", \"php\": \"matomo6_min_php\"}."
+            exit 1
+          fi
+
+          echo "PHP $(php -r 'echo PHP_VERSION;') satisfies this Matomo's floor of $MATOMO_MIN_PHP."
 
       - name: Provide the PHPStan bootstrap when Matomo predates it
         shell: bash
@@ -158,16 +187,16 @@ jobs:
           path: /tmp/phpstan # same as in phpstan.neon
           # the target is part of the key because the legs analyse different Matomo trees and
           # both save within one run, which would otherwise collide on a single key
-          key: "phpstan-result-cache-${{ matrix.matomo-target }}-${{ github.run_id }}"
+          key: "phpstan-result-cache-${{ matrix.target }}-${{ github.run_id }}"
           restore-keys: |
-            phpstan-result-cache-${{ matrix.matomo-target }}-
+            phpstan-result-cache-${{ matrix.target }}-
 
       - name: PHPStan whole repo
         id: phpstan-all
         shell: bash
         working-directory: ${{ github.workspace }}/matomo
         env:
-          MATOMO_TARGET: ${{ matrix.matomo-target }}
+          MATOMO_TARGET: ${{ matrix.target }}
         # not `composer run phpstan`: that script arrived with PHPStan itself in 5.4.0, so it
         # does not exist on older targets. The binary is equivalent — the script is only
         # `phpstan analyse -c phpstan.neon`, whose config this command overrides anyway.
@@ -192,4 +221,4 @@ jobs:
         if: ${{ !cancelled() }}
         with:
           path: /tmp/phpstan # same as in phpstan.neon
-          key: "phpstan-result-cache-${{ matrix.matomo-target }}-${{ github.run_id }}"
+          key: "phpstan-result-cache-${{ matrix.target }}-${{ github.run_id }}"

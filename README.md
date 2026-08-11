@@ -188,7 +188,20 @@ support — a call that analyses cleanly against current core and then fatals fo
 Pass a single-element array to analyse against one target:
 
 ```yaml
-      matomo-targets: '["maximum_supported_matomo"]'
+      matomo-targets: '[{"target": "maximum_supported_matomo"}]'
+```
+
+Each entry may carry its own `php`, falling back to the `php-version` input when it does not.
+Set it per target once a plugin's targets span Matomo majors: `bootstrap-phpstan.php` executes
+core rather than only parsing it, so a Matomo 6 checkout cannot be bootstrapped by the PHP 7.2
+that Matomo 5 still allows. The workflow compares the resolved PHP against the checked-out
+Matomo's `piwik_minimumPHPVersion` and fails with that instruction rather than dying on 8.1
+syntax partway through the analysis.
+
+```yaml
+      matomo-targets: >-
+        [{"target": "minimum_required_matomo", "php": "matomo5_min_php"},
+         {"target": "maximum_supported_matomo", "php": "matomo6_min_php"}]
 ```
 
 Matomo gained `phpstan/phpstan`, the composer `phpstan` script and `bootstrap-phpstan.php` in a
