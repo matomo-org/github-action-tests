@@ -115,6 +115,21 @@ jobs:
           echo -e "composer install"
           composer install --ignore-platform-reqs
 
+      - name: Provide PHPStan itself when Matomo predates it
+        shell: bash
+        working-directory: ${{ github.workspace }}/matomo
+        run: |
+          if [ -x vendor/bin/phpstan ]; then
+            echo "Matomo provides PHPStan."
+            exit 0
+          fi
+          # Matomo gained phpstan/phpstan, the composer `phpstan` script and
+          # bootstrap-phpstan.php in one commit, released in 5.4.0. On an older target there
+          # is no analyser at all, so install the same constraint that Matomo declares rather
+          # than the newest release, whose own findings would differ from the max leg's.
+          echo "Matomo predates phpstan/phpstan; installing ~1.12 to analyse against it."
+          composer require --dev --ignore-platform-reqs --no-interaction "phpstan/phpstan:~1.12"
+
       - name: checkout additional plugins
         if: ${{ inputs.dependent-plugins != '' }}
         shell: bash
@@ -136,7 +151,10 @@ jobs:
 
       - name: PHPStan whole repo
         id: phpstan-all
-        run: cd ${{ github.workspace }}/matomo && composer run phpstan -- -vvv -c "plugins/${PLUGIN_NAME}/phpstan.neon"
+        # not `composer run phpstan`: that script arrived with PHPStan itself in 5.4.0, so it
+        # does not exist on older targets. The binary is equivalent — the script is only
+        # `phpstan analyse -c phpstan.neon`, whose config this command overrides anyway.
+        run: cd ${{ github.workspace }}/matomo && vendor/bin/phpstan analyse -vvv -c "plugins/${PLUGIN_NAME}/phpstan.neon"
 
       - name: "Save result cache"
         uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
