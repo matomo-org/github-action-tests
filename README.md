@@ -191,11 +191,32 @@ Pass a single-element array to analyse against one target:
       matomo-targets: '["maximum_supported_matomo"]'
 ```
 
-Matomo only ships `bootstrap-phpstan.php` from 5.4.0, and plugin `phpstan.neon` files reference
-it as `../../bootstrap-phpstan.php`, so on an older target PHPStan would exit before analysing
-anything. The workflow copies `artifacts/bootstrap-phpstan.php` into the Matomo root when the
-checkout has none, which is what keeps the minimum leg usable for the many plugins whose
-declared floor predates that release.
+Matomo gained `phpstan/phpstan`, the composer `phpstan` script and `bootstrap-phpstan.php` in a
+single commit, released in 5.4.0. On an older target none of them exist, so the workflow copies
+`artifacts/bootstrap-phpstan.php` into the Matomo root, installs the `~1.12` PHPStan that Matomo
+itself declares, and runs `vendor/bin/phpstan` rather than the composer script. That is what
+keeps the minimum leg usable for the many plugins whose declared floor predates 5.4.0.
+
+A plugin may legitimately call a core API that its minimum Matomo does not have, guarded by
+`class_exists` so the path is unreachable there. PHPStan cannot see through that guard and
+reports the call on the minimum leg. Put those ignores in an optional
+`plugins/<Plugin>/phpstan-min-matomo.neon`, which the workflow uses **for the minimum leg only**:
+
+```neon
+includes:
+    - phpstan.neon
+
+parameters:
+    ignoreErrors:
+        -
+            message: '#unknown class Piwik\\Plugins\\CoreHome\\EntityDuplicator\\EntityDuplicatorHelper#'
+            path: API.php
+```
+
+Keeping these out of the plugin's main `phpstan.neon` matters. On the maximum leg the class
+exists, so the same entry would match nothing, and `reportUnmatchedIgnoredErrors` — on by
+default — would fail that leg instead. Unmatched entries in the minimum-only file are still
+reported on the minimum leg, so an ignore that outlives the incompatibility still surfaces.
 
 ## Git hooks (`hooks/`)
 

@@ -151,10 +151,28 @@ jobs:
 
       - name: PHPStan whole repo
         id: phpstan-all
+        shell: bash
+        working-directory: ${{ github.workspace }}/matomo
+        env:
+          MATOMO_TARGET: ${{ matrix.matomo-target }}
         # not `composer run phpstan`: that script arrived with PHPStan itself in 5.4.0, so it
         # does not exist on older targets. The binary is equivalent — the script is only
         # `phpstan analyse -c phpstan.neon`, whose config this command overrides anyway.
-        run: cd ${{ github.workspace }}/matomo && vendor/bin/phpstan analyse -vvv -c "plugins/${PLUGIN_NAME}/phpstan.neon"
+        run: |
+          CONFIG="plugins/${PLUGIN_NAME}/phpstan.neon"
+
+          # A plugin may guard a newer core API behind class_exists and still be analysed
+          # against an older Matomo that lacks it, which PHPStan cannot see through. An
+          # optional phpstan-min-matomo.neon holds those ignores. It applies to this leg only:
+          # on the maximum leg the error does not occur, so the same ignore would be unmatched
+          # and reportUnmatchedIgnoredErrors would fail that leg instead.
+          if [ "$MATOMO_TARGET" = 'minimum_required_matomo' ] \
+            && [ -f "plugins/${PLUGIN_NAME}/phpstan-min-matomo.neon" ]; then
+            CONFIG="plugins/${PLUGIN_NAME}/phpstan-min-matomo.neon"
+            echo "Using the plugin's minimum-target config: $CONFIG"
+          fi
+
+          vendor/bin/phpstan analyse -vvv -c "$CONFIG"
 
       - name: "Save result cache"
         uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
