@@ -181,6 +181,22 @@ scripts. For immutability, pin the `uses:` reference to a full commit SHA — re
 mutable unless the repository enforces immutable releases — and pass the same SHA as
 `scripts-ref`, which the workflow uses to check out its helper scripts (default: `main`).
 
+The analysis runs once per entry in `matomo-targets`, which defaults to the minimum Matomo the
+plugin's `plugin.json` declares and the maximum it supports. The minimum leg is the one that
+catches a plugin calling a core API that does not exist yet in the oldest Matomo it claims to
+support — a call that analyses cleanly against current core and then fatals for those users.
+Pass a single-element array to analyse against one target:
+
+```yaml
+      matomo-targets: '["maximum_supported_matomo"]'
+```
+
+Matomo only ships `bootstrap-phpstan.php` from 5.4.0, and plugin `phpstan.neon` files reference
+it as `../../bootstrap-phpstan.php`, so on an older target PHPStan would exit before analysing
+anything. The workflow copies `artifacts/bootstrap-phpstan.php` into the Matomo root when the
+checkout has none, which is what keeps the minimum leg usable for the many plugins whose
+declared floor predates that release.
+
 ## Git hooks (`hooks/`)
 
 `hooks/pre-push` is the canonical copy of the PHPStan pre-push hook that plugin repositories

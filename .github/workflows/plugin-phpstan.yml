@@ -27,6 +27,11 @@ on:
         required: false
         type: boolean
         default: true
+      matomo-targets:
+        description: "JSON array of Matomo versions to analyse against. Analysing the minimum is what catches a plugin calling a core API that does not exist yet in the oldest Matomo its plugin.json supports. Pass a single-element array to analyse against one."
+        required: false
+        type: string
+        default: '["minimum_required_matomo", "maximum_supported_matomo"]'
     secrets:
       TESTS_ACCESS_TOKEN:
         required: false
@@ -38,8 +43,12 @@ permissions:
 
 jobs:
   phpstan:
-    name: PHPStan
+    name: PHPStan (${{ matrix.matomo-target }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        matomo-target: ${{ fromJSON(inputs.matomo-targets) }}
     env:
       PLUGIN_NAME: ${{ inputs.plugin-name }}
       DEPENDENT_PLUGINS: ${{ inputs.dependent-plugins }}
@@ -82,7 +91,22 @@ jobs:
         env:
           WORKSPACE: ${{ github.workspace }}
           ACTION_PATH: ${{ github.workspace }}/github-action-tests
-          MATOMO_TEST_TARGET: maximum_supported_matomo
+          MATOMO_TEST_TARGET: ${{ matrix.matomo-target }}
+
+      - name: Provide the PHPStan bootstrap when Matomo predates it
+        shell: bash
+        working-directory: ${{ github.workspace }}/matomo
+        run: |
+          if [ -f bootstrap-phpstan.php ]; then
+            echo "Matomo provides bootstrap-phpstan.php."
+            exit 0
+          fi
+          # Matomo only ships this file from 5.4.0, and plugin phpstan.neon files reference it
+          # as ../../bootstrap-phpstan.php, so without it PHPStan exits before analysing
+          # anything on older targets. It has to be copied into the Matomo root rather than
+          # referenced in place: it derives PIWIK_DOCUMENT_ROOT from its own location.
+          cp "${{ github.workspace }}/github-action-tests/artifacts/bootstrap-phpstan.php" bootstrap-phpstan.php
+          echo "Matomo predates bootstrap-phpstan.php; using the copy from github-action-tests."
 
       - name: prepare setup
         shell: bash
@@ -104,9 +128,11 @@ jobs:
         uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: /tmp/phpstan # same as in phpstan.neon
-          key: "phpstan-result-cache-${{ github.run_id }}"
+          # the target is part of the key because the legs analyse different Matomo trees and
+          # both save within one run, which would otherwise collide on a single key
+          key: "phpstan-result-cache-${{ matrix.matomo-target }}-${{ github.run_id }}"
           restore-keys: |
-            phpstan-result-cache-
+            phpstan-result-cache-${{ matrix.matomo-target }}-
 
       - name: PHPStan whole repo
         id: phpstan-all
@@ -117,4 +143,4 @@ jobs:
         if: ${{ !cancelled() }}
         with:
           path: /tmp/phpstan # same as in phpstan.neon
-          key: "phpstan-result-cache-${{ github.run_id }}"
+          key: "phpstan-result-cache-${{ matrix.matomo-target }}-${{ github.run_id }}"
