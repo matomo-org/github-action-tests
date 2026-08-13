@@ -1,0 +1,38 @@
+name: Test review scripts
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'review/**'
+      - 'package.json'
+      - '.github/workflows/test-review-scripts.yml'
+      # Cross-file tests keep the workflow's trust flow and documented defaults aligned with the
+      # trusted JavaScript modules, so reusable-workflow changes must run this suite too.
+      - '.github/workflows/codex-review.yml'
+  pull_request:
+    paths:
+      - 'review/**'
+      - 'package.json'
+      - '.github/workflows/test-review-scripts.yml'
+      - '.github/workflows/codex-review.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '22'
+
+      - name: Run review script tests
+        run: npm test
