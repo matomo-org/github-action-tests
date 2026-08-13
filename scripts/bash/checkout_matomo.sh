@@ -15,7 +15,7 @@ if [ "$PLUGIN_NAME" != '' ]; then
   cp -R !($PLUGIN_NAME) $PLUGIN_NAME
 
   echo -e "${GREEN}Clone Matomo repo${SET}"
-  git clone -q --recurse-submodules https://github.com/matomo-org/matomo
+  git clone -q https://github.com/matomo-org/matomo
   git fetch -q --all
   cd $WORKSPACE/matomo
 
