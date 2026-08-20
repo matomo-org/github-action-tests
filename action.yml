@@ -194,27 +194,13 @@ runs:
     - name: Resolve PHP version
       id: resolve-php
       shell: bash
+      # the alias table lives in scripts/bash/resolve_php_version.sh so anything else needing
+      # these versions resolves the same table instead of copying it. The input arrives through
+      # the environment rather than an expression, so a caller's value is never expanded as shell.
+      env:
+        PHP_VERSION_INPUT: ${{ inputs.php-version }}
       run: |
-        case "${{ inputs.php-version }}" in
-          matomo5_min_php)
-            RESOLVED_VERSION="7.2"
-            ;;
-          matomo5_max_php)
-            RESOLVED_VERSION="8.5"
-            ;;
-          matomo6_min_php)
-            RESOLVED_VERSION="8.1"
-            ;;
-          matomo6_max_php)
-            RESOLVED_VERSION="8.5"
-            ;;
-          '')
-            exit 0
-            ;;
-          *)
-            RESOLVED_VERSION="${{ inputs.php-version }}"
-            ;;
-        esac
+        RESOLVED_VERSION=$("${{ github.action_path }}/scripts/bash/resolve_php_version.sh" "$PHP_VERSION_INPUT")
 
         echo "version=$RESOLVED_VERSION" >> "$GITHUB_OUTPUT"
 
