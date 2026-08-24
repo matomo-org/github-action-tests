@@ -154,37 +154,3 @@ This action is able to run certain test suites for Matomo or any Matomo plugin.
           dependent-plugins: 'slug/plugin-AdditionalPlugin'
           github-token: ${{ secrets.TESTS_ACCESS_TOKEN || secrets.GITHUB_TOKEN }}
 ```
-
-## Reusable workflows
-
-### PHPStan (`.github/workflows/plugin-phpstan.yml`)
-
-Runs the plugin's own `phpstan.neon` against a full Matomo checkout. A plugin repository's
-`.github/workflows/phpstan.yml` reduces to:
-
-```yaml
-name: PHPStan check
-on: pull_request
-jobs:
-  phpstan:
-    uses: matomo-org/github-action-tests/.github/workflows/plugin-phpstan.yml@main
-    with:
-      plugin-name: MyPlugin
-      # dependent-plugins: 'innocraft/plugin-Funnels'
-      # php-version: '8.2'
-    secrets:
-      TESTS_ACCESS_TOKEN: ${{ secrets.TESTS_ACCESS_TOKEN }}
-```
-
-The example uses `@main` to match how plugin repositories currently consume this repository's
-scripts. For immutability, pin the `uses:` reference to a full commit SHA — release tags stay
-mutable unless the repository enforces immutable releases — and pass the same SHA as
-`scripts-ref`, which the workflow uses to check out its helper scripts (default: `main`).
-
-## Git hooks (`hooks/`)
-
-`hooks/pre-push` is the canonical copy of the PHPStan pre-push hook that plugin repositories
-carry as `.git-hooks-matomo/pre-push` (developers opt in with
-`git config core.hooksPath .git-hooks-matomo`). Hooks must exist as local files, so plugins keep
-a copy; the reusable PHPStan workflow fails when a plugin's copy drifts from the canonical one
-(disable with `verify-hook: false`).
