@@ -70,6 +70,10 @@ inputs:
     description: "Mysql version to use for testing. Defaults to '5.7' for 'Mysql', and 'latest' for 'Mariadb' or 'Tidb'"
     required: false
     default: ''
+  mysql-timezone:
+    description: "Timezone for the database container, e.g. 'Pacific/Auckland'. Defaults to UTC, which is what CI has always run. A non-UTC value makes the server report that zone as SYSTEM, exercising code that reads dates out of the DATETIME columns Matomo stores in UTC."
+    required: false
+    default: 'UTC'
   matomo-test-branch:
     description: "Branch or tag name of Matomo to run plugin tests for. This can be either a specific name or maximum_supported_matomo or minimum_required_matomo."
     required: false
@@ -115,6 +119,7 @@ runs:
           -p 3306:3306 \
           -e MYSQL_ALLOW_EMPTY_PASSWORD=yes \
           -e MYSQL_DATABASE=matomo_tests \
+          -e TZ=${{ inputs.mysql-timezone || 'UTC' }} \
           mirror.gcr.io/library/mysql:${{ inputs.mysql-version || '5.7' }}
 
         for i in $(seq 1 30); do
@@ -142,6 +147,7 @@ runs:
           -p 3306:3306 \
           -e MARIADB_ALLOW_EMPTY_ROOT_PASSWORD=1 \
           -e MARIADB_DATABASE=matomo_tests \
+          -e TZ=${{ inputs.mysql-timezone || 'UTC' }} \
           mirror.gcr.io/library/mariadb:${{ inputs.mysql-version || 'latest' }}
 
         for i in $(seq 1 30); do

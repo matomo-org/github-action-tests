@@ -78,6 +78,13 @@ This action is able to run certain test suites for Matomo or any Matomo plugin.
     Defines which Mysql adapter Matomo should use to connect to the database. Can be set to `PDO_MYSQL` (default) or `MYSQLI`.
 
 
+  * **mysql-timezone**
+
+    Timezone for the database container, e.g. `Pacific/Auckland`. Defaults to `UTC`, which is what CI has always run, so leaving it unset changes nothing.
+
+    Matomo stores datetimes in `log_visit` and elsewhere in UTC, but SQL that reads a date back out of those columns can depend on the server's timezone. Because CI runs UTC, that class of bug passes here and only shows up for users whose database server is not on UTC. Setting a non-UTC value makes the server report that zone via `@@system_time_zone` while leaving `@@global.time_zone` at `SYSTEM`, which is how such a server is really configured.
+
+
   * **upload-artifacts**
 
     If set to true produced artifacts will be uploaded to https://build-artifacts.matomo.org
