@@ -1,0 +1,10 @@
+{
+  "name": "matomo-codex-review",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Trusted scripts for the reusable Matomo Codex PR review workflow.",
+  "license": "GPL-3.0-or-later",
+  "scripts": {
+    "test": "node --test review/*.test.js"
+  }
+}

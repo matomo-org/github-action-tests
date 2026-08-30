@@ -1,0 +1,408 @@
+name: Codex Review
+
+on:
+  workflow_call:
+    inputs:
+      trigger-label:
+        type: string
+        description: 'Pull request label that triggers the review.'
+        required: false
+        default: 'codex-review'
+      allowed-owners:
+        type: string
+        description: 'Comma-separated GitHub repository owners allowed to run this workflow.'
+        required: false
+        default: 'matomo-org,innocraft'
+      automation-paths:
+        type: string
+        description: 'Newline- or comma-separated caller-repository paths that must receive human review before Codex runs. Entries ending in / match by prefix.'
+        required: false
+        default: |
+          .github/workflows/codex-review.yml
+          .github/codex/
+      matomo-agent-skills-ref:
+        type: string
+        description: 'Ref of matomo-org/matomo-agent-skills to install before running Codex.'
+        required: false
+        default: 'main'
+      matomo-core-repository:
+        type: string
+        description: 'Matomo core repository to check out for read-only review context.'
+        required: false
+        default: 'matomo-org/matomo'
+      matomo-core-ref:
+        type: string
+        description: 'Matomo core ref to check out for read-only review context.'
+        required: false
+        default: '5.x-dev'
+      plugin-name:
+        type: string
+        description: 'Optional plugin name. If empty, the workflow reads name from plugin.json when present.'
+        required: false
+        default: ''
+      codex-model:
+        type: string
+        description: 'OpenAI model passed to openai/codex-action. Override only to move off the default.'
+        required: false
+        default: 'gpt-5.6-sol'
+      codex-effort:
+        type: string
+        description: 'Reasoning effort passed to openai/codex-action (Codex model_reasoning_effort): minimal, low, medium, high, or xhigh.'
+        required: false
+        default: 'xhigh'
+    secrets:
+      OPENAI_API_KEY:
+        description: 'OpenAI API key used by openai/codex-action.'
+        required: true
+
+permissions:
+  contents: none
+
+# In a reusable (workflow_call) workflow, ${{ github.workflow }} resolves to the CALLER's
+# workflow name. If the caller is named "Codex Review" and uses github.workflow in its own
+# concurrency group, both groups collide and GitHub cancels with "a deadlock was detected for
+# concurrency group ... between a top level workflow and 'codex-review'". Use a static prefix
+# unique to this reusable workflow so its group can never match the caller's group.
+concurrency:
+  group: codex-review-reusable-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  preflight:
+    if: ${{ github.event.action == 'labeled' && github.event.label.name == inputs.trigger-label }}
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      should_run: ${{ steps.inspect.outputs.should_run || steps.request.outputs.should_run }}
+      safety_failure: ${{ steps.inspect.outputs.safety_failure || steps.request.outputs.safety_failure }}
+      safety_message: ${{ steps.inspect.outputs.safety_message || steps.request.outputs.safety_message }}
+      skip_reason: ${{ steps.inspect.outputs.skip_reason || steps.request.outputs.skip_reason }}
+      skip_message: ${{ steps.inspect.outputs.skip_message || steps.request.outputs.skip_message }}
+      changed_files: ${{ steps.inspect.outputs.changed_files || steps.request.outputs.changed_files }}
+      automation_files: ${{ steps.inspect.outputs.automation_files || steps.request.outputs.automation_files }}
+      base_sha: ${{ steps.request.outputs.base_sha }}
+      head_sha: ${{ steps.request.outputs.head_sha }}
+    steps:
+      - name: Checkout trusted workflow assets
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: github-action-tests
+          persist-credentials: false
+
+      - name: Validate review request
+        id: request
+        uses: actions/github-script@373c709c69115d41ff229c7e5df9f8788daa9553
+        env:
+          ALLOWED_OWNERS: ${{ inputs.allowed-owners }}
+        with:
+          script: |
+            const { validateReviewRequest } = require('./github-action-tests/review/preflight.js');
+            await validateReviewRequest({
+              github,
+              context,
+              core,
+              allowedOwners: process.env.ALLOWED_OWNERS,
+            });
+
+      - name: Checkout frozen PR snapshot for preflight
+        if: ${{ steps.request.outputs.should_inspect == 'true' }}
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          ref: ${{ steps.request.outputs.head_sha }}
+          path: pr-preflight
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Inspect frozen changed files
+        if: ${{ steps.request.outputs.should_inspect == 'true' }}
+        id: inspect
+        uses: actions/github-script@373c709c69115d41ff229c7e5df9f8788daa9553
+        env:
+          AUTOMATION_PATHS: ${{ inputs.automation-paths }}
+          BASE_SHA: ${{ steps.request.outputs.base_sha }}
+          HEAD_SHA: ${{ steps.request.outputs.head_sha }}
+        with:
+          script: |
+            const path = require('node:path');
+            const { inspectFrozenChanges } = require('./github-action-tests/review/preflight.js');
+            inspectFrozenChanges({
+              core,
+              checkoutPath: path.join(process.env.GITHUB_WORKSPACE, 'pr-preflight'),
+              automationPaths: process.env.AUTOMATION_PATHS,
+              baseSha: process.env.BASE_SHA,
+              headSha: process.env.HEAD_SHA,
+            });
+
+  codex:
+    needs: preflight
+    if: ${{ needs.preflight.outputs.should_run == 'true' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - name: Verify OpenAI API key is configured
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          if [ -z "${OPENAI_API_KEY}" ]; then
+            echo "::error::OPENAI_API_KEY secret is not configured for this repository. Set it (repo or org secret scoped to this repo) before running the Codex review workflow." >&2
+            exit 1
+          fi
+
+      - name: Checkout trusted workflow assets
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: github-action-tests
+          persist-credentials: false
+
+      - name: Checkout PR
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          ref: ${{ needs.preflight.outputs.head_sha }}
+          path: pr
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Verify frozen PR snapshot
+        working-directory: pr
+        env:
+          BASE_SHA: ${{ needs.preflight.outputs.base_sha }}
+          HEAD_SHA: ${{ needs.preflight.outputs.head_sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$HEAD_SHA"
+          git cat-file -e "${BASE_SHA}^{commit}"
+
+      - name: Checkout Matomo core context
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          repository: ${{ inputs.matomo-core-repository }}
+          ref: ${{ inputs.matomo-core-ref }}
+          path: matomo-core
+          persist-credentials: false
+
+      - name: Map plugin into Matomo core context
+        id: plugin-context
+        env:
+          PLUGIN_NAME_INPUT: ${{ inputs.plugin-name }}
+          MATOMO_CORE_REF: ${{ inputs.matomo-core-ref }}
+          MATOMO_CORE_REPOSITORY: ${{ inputs.matomo-core-repository }}
+        run: |
+          set -euo pipefail
+
+          plugin_name="$PLUGIN_NAME_INPUT"
+          matomo_core_sha="$(git -C matomo-core rev-parse HEAD)"
+          if [ -z "$plugin_name" ] && [ -f pr/plugin.json ]; then
+            # plugin.json comes from the untrusted PR; a malformed file must not abort the review
+            # (set -e would kill the step on a JSON.parse throw), so swallow parse errors and treat
+            # it as "no name", which then falls through to running without a core-layout mapping.
+            plugin_name="$(node -e "try { const fs = require('fs'); const plugin = JSON.parse(fs.readFileSync('pr/plugin.json', 'utf8')); process.stdout.write(typeof plugin.name === 'string' ? plugin.name : ''); } catch (e) { process.stdout.write(''); }")"
+          fi
+
+          # plugin_name may come from the untrusted PR plugin.json and is interpolated into a symlink
+          # path and written to $GITHUB_OUTPUT, so restrict it to a safe plugin-name charset to prevent
+          # path traversal and step-output injection. Matomo plugin names are PHP-namespace/directory
+          # identifiers, so [A-Za-z0-9_] is the valid set. On mismatch, drop the mapping and continue.
+          if [ -n "$plugin_name" ] && ! [[ "$plugin_name" =~ ^[A-Za-z0-9_]+$ ]]; then
+            echo "::warning::Ignoring invalid plugin name; expected characters [A-Za-z0-9_]. Continuing without core-layout mapping."
+            plugin_name=""
+          fi
+
+          plugin_in_core_path=""
+          if [ -n "$plugin_name" ]; then
+            mkdir -p matomo-core/plugins
+            plugin_in_core_path="$GITHUB_WORKSPACE/matomo-core/plugins/$plugin_name"
+            # The core checkout may already bundle a plugin of this name. Always map the PR
+            # checkout here so Codex inspects the PR's code, not the stale core copy; replace whatever
+            # exists (a real core plugin directory or a leftover link). plugin_name is validated to
+            # [A-Za-z0-9_]+ above, so this rm -rf cannot escape matomo-core/plugins.
+            rm -rf "$plugin_in_core_path"
+            ln -s "$GITHUB_WORKSPACE/pr" "$plugin_in_core_path"
+          fi
+
+          context_file="$RUNNER_TEMP/codex-review-core-context.json"
+          export CONTEXT_FILE="$context_file"
+          export PLUGIN_NAME="$plugin_name"
+          export PLUGIN_IN_CORE_PATH="$plugin_in_core_path"
+          export MATOMO_CORE_SHA="$matomo_core_sha"
+          node -e '
+            const fs = require("fs");
+            fs.writeFileSync(process.env.CONTEXT_FILE, `${JSON.stringify({
+              plugin_name: process.env.PLUGIN_NAME,
+              plugin_repository_path: `${process.env.GITHUB_WORKSPACE}/pr`,
+              matomo_core_repository: process.env.MATOMO_CORE_REPOSITORY,
+              matomo_core_ref: process.env.MATOMO_CORE_REF,
+              matomo_core_sha: process.env.MATOMO_CORE_SHA,
+              matomo_core_path: `${process.env.GITHUB_WORKSPACE}/matomo-core`,
+              plugin_in_core_path: process.env.PLUGIN_IN_CORE_PATH,
+            }, null, 2)}\n`);
+          '
+
+          echo "plugin_name=$plugin_name" >> "$GITHUB_OUTPUT"
+          echo "plugin_in_core_path=$plugin_in_core_path" >> "$GITHUB_OUTPUT"
+          echo "context_file=$context_file" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout Matomo skills
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          repository: matomo-org/matomo-agent-skills
+          ref: ${{ inputs.matomo-agent-skills-ref }}
+          path: matomo-agent-skills
+          persist-credentials: false
+
+      - name: Install Matomo skills
+        env:
+          CODEX_HOME: ${{ runner.temp }}/codex-home
+        run: |
+          set -euo pipefail
+          mkdir -p "$CODEX_HOME/skills"
+          find matomo-agent-skills/skills -maxdepth 1 -mindepth 1 -type d -name 'matomo-*' -exec cp -R {} "$CODEX_HOME/skills/" \;
+          test -f "$CODEX_HOME/skills/matomo-review/SKILL.md"
+
+      - name: Configure Codex
+        env:
+          CODEX_HOME: ${{ runner.temp }}/codex-home
+        run: |
+          set -euo pipefail
+          mkdir -p "$CODEX_HOME"
+          cat > "$CODEX_HOME/config.toml" <<'EOF'
+          project_doc_max_bytes = 0
+          web_search = "disabled"
+
+          [shell_environment_policy]
+          inherit = "core"
+          ignore_default_excludes = false
+          exclude = ["*KEY*", "*SECRET*", "*TOKEN*", "GITHUB_*", "ACTIONS_*", "OPENAI_*", "CODEX_*"]
+          EOF
+
+      - name: Render Codex prompt
+        env:
+          PROMPT_TEMPLATE: ${{ github.workspace }}/github-action-tests/review/review-prompt.md
+          PROMPT_OUTPUT: ${{ runner.temp }}/codex-review-prompt.md
+          REVIEW_CONTEXT: ${{ runner.temp }}/codex-review-context.json
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          BASE_SHA: ${{ needs.preflight.outputs.base_sha }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          HEAD_SHA: ${{ needs.preflight.outputs.head_sha }}
+          CHANGED_FILES: ${{ needs.preflight.outputs.changed_files }}
+          MATOMO_CORE_CONTEXT: ${{ steps.plugin-context.outputs.context_file }}
+          MATOMO_CORE_PATH: ${{ github.workspace }}/matomo-core
+          PLUGIN_NAME: ${{ steps.plugin-context.outputs.plugin_name }}
+          PLUGIN_IN_CORE_PATH: ${{ steps.plugin-context.outputs.plugin_in_core_path }}
+        run: |
+          set -euo pipefail
+          node github-action-tests/review/render-review-prompt.js
+
+      - name: Run Codex review
+        id: run_codex
+        uses: openai/codex-action@10cb888d2ed3b99867f7e7ccff174a861a75aeb6
+        with:
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          model: ${{ inputs.codex-model }}
+          effort: ${{ inputs.codex-effort }}
+          prompt-file: ${{ runner.temp }}/codex-review-prompt.md
+          output-file: ${{ runner.temp }}/codex-review-output.json
+          output-schema-file: ${{ github.workspace }}/github-action-tests/review/review-output.schema.json
+          codex-home: ${{ runner.temp }}/codex-home
+          working-directory: ${{ github.workspace }}/pr
+          sandbox: read-only
+          safety-strategy: drop-sudo
+
+      - name: Upload Codex diagnostics
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: codex-review-output
+          path: |
+            ${{ runner.temp }}/codex-review-output.json
+            ${{ runner.temp }}/codex-review-context.json
+            ${{ runner.temp }}/codex-review-core-context.json
+          if-no-files-found: ignore
+          retention-days: 7
+
+  post-review:
+    needs: [preflight, codex]
+    if: ${{ always() && github.event.action == 'labeled' && github.event.label.name == inputs.trigger-label }}
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: read
+      contents: read
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Checkout trusted workflow assets
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: github-action-tests
+          persist-credentials: false
+
+      - name: Download Codex diagnostics
+        if: ${{ needs.codex.result == 'success' }}
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: codex-review-output
+          path: ${{ runner.temp }}/codex-review
+
+      - name: Post review result
+        uses: actions/github-script@373c709c69115d41ff229c7e5df9f8788daa9553
+        env:
+          CODEX_OUTPUT_DIR: ${{ runner.temp }}/codex-review
+          CODEX_RESULT: ${{ needs.codex.result }}
+          PREFLIGHT_RESULT: ${{ needs.preflight.result }}
+          PREFLIGHT_SAFETY_FAILURE: ${{ needs.preflight.outputs.safety_failure }}
+          PREFLIGHT_SAFETY_MESSAGE: ${{ needs.preflight.outputs.safety_message }}
+          PREFLIGHT_SKIP_REASON: ${{ needs.preflight.outputs.skip_reason }}
+          PREFLIGHT_SKIP_MESSAGE: ${{ needs.preflight.outputs.skip_message }}
+          REVIEWED_BASE_SHA: ${{ needs.preflight.outputs.base_sha }}
+          REVIEWED_HEAD_SHA: ${{ needs.preflight.outputs.head_sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        with:
+          script: |
+            const postReview = require('./github-action-tests/review/post-review.js');
+            await postReview({ github, context, core });
+
+  cleanup:
+    needs: [preflight, codex, post-review]
+    if: ${{ always() && github.event.action == 'labeled' && github.event.label.name == inputs.trigger-label }}
+    runs-on: ubuntu-24.04
+    permissions:
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Remove trigger label
+        uses: actions/github-script@373c709c69115d41ff229c7e5df9f8788daa9553
+        env:
+          TRIGGER_LABEL: ${{ inputs.trigger-label }}
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            try {
+              await github.rest.issues.removeLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pr.number,
+                name: process.env.TRIGGER_LABEL,
+              });
+            } catch (error) {
+              if (error.status === 404) {
+                core.info(`${process.env.TRIGGER_LABEL} label was already removed.`);
+                return;
+              }
+              if (error.status === 403) {
+                core.warning(`Could not remove ${process.env.TRIGGER_LABEL} label because this workflow token lacks permission.`);
+                return;
+              }
+              throw error;
+            }

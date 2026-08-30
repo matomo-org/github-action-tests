@@ -2,6 +2,11 @@
 
 This action is able to run certain test suites for Matomo or any Matomo plugin.
 
+The repository also contains a reusable Codex review workflow documented at
+[`review`](review/README.md). It is separate from the main tests action and is
+triggered from consuming repositories by adding the `codex-review` pull request
+label.
+
 ### Inputs
 
   * **test-type**
