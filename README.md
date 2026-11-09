@@ -36,7 +36,7 @@ This action is able to run certain test suites for Matomo or any Matomo plugin.
 
       If a version is defined in `plugin.json` this version will be tried to check out. If e.g. `>=4.0.0-b1,<5.0.0-b1` is defined it will try to check out `4.0.0-b1`.
 
-      In case the defined version can not be found. e.g. the tag `4.0.0-b1` is not available, it will first try to check out the stable version (if beta provided). e.g. `4.0.0` in this example. If that would also fail it falls back to the development branch of that major version. So `4.x-dev` in that case.
+      In case the defined version can not be found. e.g. the tag `4.0.0-b1` is not available, it will first try to check out the stable version (if beta provided). e.g. `4.0.0` in this example. If that would also fail it falls back to the development branch of that major version. If that branch does not exist either, it falls back to `5.x-dev`.
 
     - **maximum_supported_matomo**
 
@@ -53,7 +53,7 @@ This action is able to run certain test suites for Matomo or any Matomo plugin.
 
     Defines the PHP version to set up for testing. (Not needed for Client tests)
 
-    Use `matomo5_min_php` or `matomo5_max_php` to resolve to the centrally managed (defined in action.yml) minimum or maximum PHP versions supported by Matomo tests.
+    Use `matomo5_min_php`/`matomo5_max_php` (Matomo 5) or `matomo6_min_php`/`matomo6_max_php` (Matomo 6) to resolve to the centrally managed minimum or maximum PHP versions supported by Matomo tests. The alias table is `scripts/bash/resolve_php_version.sh`, so anything else needing these versions can resolve the same table instead of copying it.
 
     The action uses `shivammathur/setup-php` to set up PHP. You can find supported PHP versions here: https://github.com/shivammathur/setup-php#tada-php-support
 
@@ -76,6 +76,13 @@ This action is able to run certain test suites for Matomo or any Matomo plugin.
   * **mysql-driver**
 
     Defines which Mysql adapter Matomo should use to connect to the database. Can be set to `PDO_MYSQL` (default) or `MYSQLI`.
+
+
+  * **mysql-timezone**
+
+    Timezone for the database container, e.g. `Pacific/Auckland`. Defaults to `UTC`, which is what CI has always run, so leaving it unset changes nothing.
+
+    Matomo stores datetimes in `log_visit` and elsewhere in UTC, but SQL that reads a date back out of those columns can depend on the server's timezone. Because CI runs UTC, that class of bug passes here and only shows up for users whose database server is not on UTC. Setting a non-UTC value makes the server report that zone via `@@system_time_zone` while leaving `@@global.time_zone` at `SYSTEM`, which is how such a server is really configured.
 
 
   * **upload-artifacts**

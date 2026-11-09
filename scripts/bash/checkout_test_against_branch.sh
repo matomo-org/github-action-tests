@@ -9,9 +9,9 @@ if [[ "$MATOMO_TEST_TARGET" == "minimum_required_matomo" && "$PLUGIN_NAME" != ""
 
       export MATOMO_TEST_TARGET=${MATOMO_TEST_TARGET%-*}
     elif ! git ls-remote --exit-code origin "${MATOMO_TEST_TARGET:0:1}.x-dev" >/dev/null 2>&1; then
-      echo "Could not find development branch '${MATOMO_TEST_TARGET:0:1}.x-dev' for '$MATOMO_TEST_TARGET' specified in plugin.json, testing against 4.x-dev."
+      echo "Could not find development branch '${MATOMO_TEST_TARGET:0:1}.x-dev' for '$MATOMO_TEST_TARGET' specified in plugin.json, testing against 5.x-dev."
 
-      export MATOMO_TEST_TARGET=4.x-dev
+      export MATOMO_TEST_TARGET=5.x-dev
     else
       echo "Could not find tag '$MATOMO_TEST_TARGET' specified in plugin.json, testing against development branch ${MATOMO_TEST_TARGET:0:1}.x-dev."
 
@@ -23,9 +23,9 @@ elif [[ "$MATOMO_TEST_TARGET" == "maximum_supported_matomo" && "$PLUGIN_NAME" !=
 
   if ! git ls-remote --exit-code origin "$MATOMO_TEST_TARGET" >/dev/null 2>&1; then
     if ! git ls-remote --exit-code origin "${MATOMO_TEST_TARGET:0:1}.x-dev" >/dev/null 2>&1; then
-      echo "Could not find development branch '${MATOMO_TEST_TARGET:0:1}.x-dev' for '$MATOMO_TEST_TARGET' specified in plugin.json, testing against 4.x-dev."
+      echo "Could not find development branch '${MATOMO_TEST_TARGET:0:1}.x-dev' for '$MATOMO_TEST_TARGET' specified in plugin.json, testing against 5.x-dev."
 
-      export MATOMO_TEST_TARGET=4.x-dev
+      export MATOMO_TEST_TARGET=5.x-dev
     else
       echo "Could not find tag '$MATOMO_TEST_TARGET' specified in plugin.json, testing against development branch ${MATOMO_TEST_TARGET:0:1}.x-dev."
 
