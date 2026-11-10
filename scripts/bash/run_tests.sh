@@ -4,7 +4,7 @@ GREEN='\033[0;32m'
 SET='\033[0m'
 
 function should_report_to_testomatio {
-  if [ -v "$TESTOMATIO" ]; then
+  if [ -z "$TESTOMATIO" ]; then
     return 1 # Return false
   fi
   if [ "$TESTOMATIO_FORCE_REPORT" == "true" ]; then
