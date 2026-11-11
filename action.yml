@@ -70,6 +70,11 @@ inputs:
     description: "Mysql version to use for testing. Defaults to '5.7' for 'Mysql', and 'latest' for 'Mariadb' or 'Tidb'"
     required: false
     default: ''
+  service-image-cache:
+    type: boolean
+    description: "If true, database and redis images are loaded from the repository's Actions cache when pulling them keeps failing. Runs other than pull requests keep that copy up to date."
+    required: false
+    default: true
   mysql-timezone:
     description: "Timezone for the database container, e.g. 'Pacific/Auckland'. Defaults to UTC, which is what CI has always run. A non-UTC value makes the server report that zone as SYSTEM, exercising code that reads dates out of the DATETIME columns Matomo stores in UTC."
     required: false
@@ -108,6 +113,83 @@ runs:
   using: "composite"
   steps:
 
+    - name: Pull service images
+      id: service-images
+      if: inputs.mysql-service == 'true' || inputs.redis-service == 'true'
+      shell: bash
+      env:
+        MYSQL_SERVICE: ${{ inputs.mysql-service }}
+        MYSQL_ENGINE: ${{ inputs.mysql-engine }}
+        MYSQL_VERSION: ${{ inputs.mysql-version }}
+        REDIS_SERVICE: ${{ inputs.redis-service }}
+      run: |
+        images=()
+        if [ "$MYSQL_SERVICE" = true ]; then
+          case "$MYSQL_ENGINE" in
+            Mysql) images+=("mirror.gcr.io/library/mysql:${MYSQL_VERSION:-5.7}") ;;
+            Mariadb) images+=("mirror.gcr.io/library/mariadb:${MYSQL_VERSION:-latest}") ;;
+            Tidb) images+=("mirror.gcr.io/pingcap/tidb:${MYSQL_VERSION:-latest}") ;;
+          esac
+          [ ${#images[@]} -eq 0 ] || echo "database=${images[0]}" >> "$GITHUB_OUTPUT"
+        fi
+        if [ "$REDIS_SERVICE" = true ]; then
+          # Pinned by version tag, not digest: a copy loaded from the cache keeps its tag but loses its digest.
+          images+=(mirror.gcr.io/library/redis:8.6.3)
+          echo "redis=mirror.gcr.io/library/redis:8.6.3" >> "$GITHUB_OUTPUT"
+        fi
+        [ ${#images[@]} -gt 0 ] || exit 0
+        echo "images=${images[*]}" >> "$GITHUB_OUTPUT"
+        echo "key=matomo-service-images-$(echo "${images[*]}" | sha256sum | cut -c1-16)" >> "$GITHUB_OUTPUT"
+        for image in "${images[@]}"; do
+          for attempt in 1 2 3; do
+            if docker pull -q "$image"; then
+              continue 2
+            fi
+            [ "$attempt" = 3 ] || sleep $((attempt * 10))
+          done
+          echo "::warning::Could not pull $image"
+          echo "failed=true" >> "$GITHUB_OUTPUT"
+          exit 0
+        done
+
+    - name: Restore service images from the Actions cache
+      id: service-images-restore
+      if: steps.service-images.outputs.failed == 'true' && inputs.service-image-cache == 'true'
+      uses: actions/cache/restore@v6
+      with:
+        path: ${{ runner.temp }}/matomo-service-images
+        key: ${{ steps.service-images.outputs.key }}
+
+    - name: Load service images
+      if: steps.service-images-restore.outputs.cache-hit == 'true'
+      shell: bash
+      run: docker load -i "$RUNNER_TEMP/matomo-service-images/images.tar"
+
+    - name: Check the Actions cache for the service images
+      id: service-images-cached
+      if: steps.service-images.outputs.key != '' && steps.service-images.outputs.failed != 'true' && inputs.service-image-cache == 'true' && github.event_name != 'pull_request'
+      uses: actions/cache/restore@v6
+      with:
+        path: ${{ runner.temp }}/matomo-service-images
+        key: ${{ steps.service-images.outputs.key }}
+        lookup-only: true
+
+    - name: Save service images
+      if: steps.service-images-cached.outcome == 'success' && steps.service-images-cached.outputs.cache-hit != 'true'
+      shell: bash
+      env:
+        IMAGES: ${{ steps.service-images.outputs.images }}
+      run: |
+        mkdir -p "$RUNNER_TEMP/matomo-service-images"
+        docker save -o "$RUNNER_TEMP/matomo-service-images/images.tar" $IMAGES
+
+    - name: Store service images in the Actions cache
+      if: steps.service-images-cached.outcome == 'success' && steps.service-images-cached.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v6
+      with:
+        path: ${{ runner.temp }}/matomo-service-images
+        key: ${{ steps.service-images.outputs.key }}
+
     - name: start mysql services
       if: inputs.mysql-service == 'true' && inputs.mysql-engine == 'Mysql'
       shell: bash
@@ -122,7 +204,7 @@ runs:
           -e MYSQL_ALLOW_EMPTY_PASSWORD=yes \
           -e MYSQL_DATABASE=matomo_tests \
           -e TZ="$MYSQL_TIMEZONE" \
-          mirror.gcr.io/library/mysql:${{ inputs.mysql-version || '5.7' }}
+          ${{ steps.service-images.outputs.database }}
 
         for i in $(seq 1 30); do
           if mysqladmin ping -h127.0.0.1 -uroot --silent; then
@@ -152,7 +234,7 @@ runs:
           -e MARIADB_ALLOW_EMPTY_ROOT_PASSWORD=1 \
           -e MARIADB_DATABASE=matomo_tests \
           -e TZ="$MYSQL_TIMEZONE" \
-          mirror.gcr.io/library/mariadb:${{ inputs.mysql-version || 'latest' }}
+          ${{ steps.service-images.outputs.database }}
 
         for i in $(seq 1 30); do
           if mysqladmin ping -h127.0.0.1 -uroot --silent; then
@@ -177,7 +259,7 @@ runs:
         docker run -d \
           -p 3306:4000 \
           -e TZ="$MYSQL_TIMEZONE" \
-          mirror.gcr.io/pingcap/tidb:${{ inputs.mysql-version || 'latest' }}
+          ${{ steps.service-images.outputs.database }}
 
         for i in $(seq 1 30); do
           if mysqladmin ping -h127.0.0.1 -uroot --silent; then
@@ -197,12 +279,12 @@ runs:
     - name: start redis services
       if: inputs.redis-service == 'true'
       shell: bash
+      env:
+        REDIS_IMAGE: ${{ steps.service-images.outputs.redis }}
       run: |
-        # TODO: Revert to :latest once bitnamisecure re-publishes the libredis.sh chmod fix
-        # (https://github.com/bitnami/containers/commit/fb2397d1f8be765c910a48d812515ff09da3a25f).
-        # The current :latest (pushed 2026-06-02) ships 8.8.0-debian-12-r0 which fails container init.
-        docker run -d --name redis -e ALLOW_EMPTY_PASSWORD=yes -p 6379:6379 mirror.gcr.io/bitnamisecure/redis@sha256:1347d526ecec0c6537e99eac09e7c3405c21664f6044ff60e78b0898da37abd2
-        docker run -d --name mymaster -e REDIS_MASTER_HOST=localhost -p 26379:26379 mirror.gcr.io/bitnamisecure/redis-sentinel@sha256:96317ad4ce459771b81271607afb9c35a7bb50acb7cad26a273e3c1b5fac581e
+        docker run -d --name redis -p 6379:6379 "$REDIS_IMAGE"
+        docker run -d --name mymaster -p 26379:26379 "$REDIS_IMAGE" \
+          sh -c 'printf "port 26379\nsentinel monitor mymaster 127.0.0.1 6379 1\n" > /tmp/sentinel.conf && exec redis-sentinel /tmp/sentinel.conf'
 
     - name: Resolve PHP version
       id: resolve-php
