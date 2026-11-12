@@ -86,7 +86,8 @@ if [ "$TEST_SUITE" = "JS" ] || [ "$TEST_SUITE" = "Client" ]; then
   cd $WORKSPACE/matomo
   echo -e "${GREEN}start php on 80${SET}"
   sudo setcap CAP_NET_BIND_SERVICE=+eip $(readlink -f $(which php))
-  tmux new-session -d -s "php-cgi" sudo php -S 127.0.0.1:80
+  # sudo resets the environment, so pass the flag through explicitly
+  tmux new-session -d -s "php-cgi" sudo env MATOMO_REPORT_DEPRECATIONS="$MATOMO_REPORT_DEPRECATIONS" php -S 127.0.0.1:80
   tmux ls
 else
   echo -e "${GREEN}setup php-fpm${SET}"
@@ -95,6 +96,10 @@ else
   sudo systemctl start php$PHP_VERSION-fpm.service
   sudo sed -i "s!{VersionNumber}!$PHP_VERSION!g" $ACTION_PATH/artifacts/www.conf
   sudo cp $ACTION_PATH/artifacts/www.conf /etc/php/$PHP_VERSION/fpm/pool.d/
+  # php-fpm clears the environment of its workers by default
+  if [ -n "$MATOMO_REPORT_DEPRECATIONS" ]; then
+    echo "env[MATOMO_REPORT_DEPRECATIONS] = $MATOMO_REPORT_DEPRECATIONS" | sudo tee -a /etc/php/$PHP_VERSION/fpm/pool.d/www.conf > /dev/null
+  fi
   sudo systemctl reload php$PHP_VERSION-fpm.service
   sudo systemctl restart php$PHP_VERSION-fpm.service
   sudo sed -i "s!{VersionNumber}!$PHP_VERSION!g" $ACTION_PATH/artifacts/ui_nginx.conf
