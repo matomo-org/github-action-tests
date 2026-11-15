@@ -15,13 +15,13 @@ case "$1" in
     RESOLVED_VERSION="7.2"
     ;;
   matomo5_max_php)
-    RESOLVED_VERSION="8.5"
+    RESOLVED_VERSION="8.6"
     ;;
   matomo6_min_php)
     RESOLVED_VERSION="8.1"
     ;;
   matomo6_max_php)
-    RESOLVED_VERSION="8.5"
+    RESOLVED_VERSION="8.6"
     ;;
   *)
     RESOLVED_VERSION="$1"
