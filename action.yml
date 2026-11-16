@@ -103,10 +103,20 @@ inputs:
     description: "Flag for whether to force uploading a report to Testomat.io instead of just push events. Only applies if the 'testomatio' token is set."
     required: false
     default: false
+  report-deprecations:
+    type: boolean
+    description: "Report PHP deprecations that Matomo hides by default on PHP 8.4 and later, by setting MATOMO_REPORT_DEPRECATIONS for the tests and the web server."
+    required: false
+    default: false
 
 runs:
   using: "composite"
   steps:
+
+    - name: enable deprecation reporting
+      if: inputs.report-deprecations == 'true'
+      shell: bash
+      run: echo "MATOMO_REPORT_DEPRECATIONS=1" >> "$GITHUB_ENV"
 
     - name: start mysql services
       if: inputs.mysql-service == 'true' && inputs.mysql-engine == 'Mysql'

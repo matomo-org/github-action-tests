@@ -134,6 +134,11 @@ This action is able to run certain test suites for Matomo or any Matomo plugin.
     Additional options to provide for PHPUnit tests. This can be used to provide debugging options for PHPUnit.
 
 
+  * **report-deprecations**
+
+    Set to `true` to report PHP deprecations that Matomo hides by default on PHP 8.4 and later. It sets `MATOMO_REPORT_DEPRECATIONS=1` for the tests and the web server they call. Useful for checking a new PHP version, typically from a manually dispatched workflow. Requires a Matomo version that reads the variable.
+
+
 ### Example usage for a Plugin
 ```yaml
   PluginTests:
