@@ -167,6 +167,8 @@ runs:
 
     - name: Check the Actions cache for the service images
       id: service-images-cached
+      # Keeping the copy up to date must never fail a job, so the steps below continue on errors.
+      continue-on-error: true
       if: steps.service-images.outputs.key != '' && steps.service-images.outputs.failed != 'true' && inputs.service-image-cache == 'true' && github.event_name != 'pull_request'
       uses: actions/cache/restore@v6
       with:
@@ -175,6 +177,8 @@ runs:
         lookup-only: true
 
     - name: Save service images
+      id: service-images-save
+      continue-on-error: true
       if: steps.service-images-cached.outcome == 'success' && steps.service-images-cached.outputs.cache-hit != 'true'
       shell: bash
       env:
@@ -184,7 +188,8 @@ runs:
         docker save -o "$RUNNER_TEMP/matomo-service-images/images.tar" $IMAGES
 
     - name: Store service images in the Actions cache
-      if: steps.service-images-cached.outcome == 'success' && steps.service-images-cached.outputs.cache-hit != 'true'
+      continue-on-error: true
+      if: steps.service-images-save.outcome == 'success'
       uses: actions/cache/save@v6
       with:
         path: ${{ runner.temp }}/matomo-service-images
