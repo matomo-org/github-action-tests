@@ -2,55 +2,67 @@
 
 # NOTE: should be removed when composer used to handle plugin dependencies
 
+set -e
+
 if [ "$DEPENDENT_PLUGINS" == "" ]; then
   echo "No dependent plugins."
-else
-  echo "Cloning dependent plugins..."
-  echo ""
-  PLUGINS=($DEPENDENT_PLUGINS)
-  for pluginSlug in ${PLUGINS[@]}; do
-    dependentPluginName=$(echo "$pluginSlug" | sed -E 's/[a-zA-Z0-9_-]+\/[a-zA-Z0-9_]+-(.*)/\1/')
+  exit 0
+fi
 
-    if [ "$dependentPluginName" == "" ]; then
-        continue
-    fi
+echo "Cloning dependent plugins..."
+echo ""
 
-    echo "Cloning $pluginSlug into plugins/$dependentPluginName..."
+CLONE_DIR=$(mktemp -d)
+FAILED=""
 
-    rm -rf "plugins/$dependentPluginName"
+# The token is sent as a header, so it is not kept in the address of the clone.
+GIT_AUTH=()
+if [ "$GITHUB_USER_TOKEN" != "" ]; then
+  GIT_AUTH=(-c "http.extraheader=Authorization: Basic $(printf 'x-access-token:%s' "$GITHUB_USER_TOKEN" | base64 | tr -d '\n')")
+fi
 
-    if [ "$GITHUB_USER_TOKEN" == "" ]; then
-      REPO="https://github.com/$pluginSlug"
-    else
-      REPO="https://$GITHUB_USER_TOKEN:@github.com/$pluginSlug"
-    fi
-    
-    CHECKOUTERROR=false
-    
-    git clone --depth=1 $REPO "plugins/$dependentPluginName" || CHECKOUTERROR=true
-    
-    if [ "$CHECKOUTERROR" = true ]; then
-        echo "Failed to checkout $pluginSlug. Skipping."
-        continue
-    fi
+for pluginSlug in ${DEPENDENT_PLUGINS//,/ }; do
+  target="$CLONE_DIR/$(basename "$pluginSlug")"
 
-    if [[ $TARGET_BRANCH =~ ^[0-9]\.x-dev$ ]]; then
-      cd plugins/$dependentPluginName
-      git fetch origin $TARGET_BRANCH || true
-      git checkout FETCH_HEAD || true
-      cd ../..
-    fi
+  echo "Cloning $pluginSlug..."
+  if ! git "${GIT_AUTH[@]}" clone --depth=1 "https://github.com/$pluginSlug" "$target"; then
+    echo "::error::Failed to check out the dependent plugin $pluginSlug"
+    FAILED="$FAILED $pluginSlug"
+    continue
+  fi
 
-    rm -rf "plugins/$dependentPluginName/tests/Integration"
-    rm -rf "plugins/$dependentPluginName/Test/Integration"
-    rm -rf "plugins/$dependentPluginName/tests/Unit"
-    rm -rf "plugins/$dependentPluginName/Test/Unit"
-    rm -rf "plugins/$dependentPluginName/tests/System"
-    rm -rf "plugins/$dependentPluginName/Test/System"
-  done
+  if [[ $TARGET_BRANCH =~ ^[0-9]\.x-dev$ ]]; then
+    git -C "$target" "${GIT_AUTH[@]}" fetch --depth=1 origin "$TARGET_BRANCH" && git -C "$target" checkout FETCH_HEAD || true
+  fi
 
-  echo "Plugin directory:"
-  echo ""
+  # The folder of a plugin is the name in its plugin.json, whatever the repository is called.
+  dependentPluginName=$(php -r '$json = json_decode((string) @file_get_contents($argv[1]), true); echo is_array($json) && is_string($json["name"] ?? null) ? $json["name"] : "";' "$target/plugin.json")
+  if [[ ! $dependentPluginName =~ ^[a-zA-Z0-9_]+$ ]]; then
+    echo "::error::$pluginSlug has no plugin.json with a plugin name"
+    FAILED="$FAILED $pluginSlug"
+    continue
+  fi
 
-  ls -d plugins/*
+  echo "Placing $pluginSlug in plugins/$dependentPluginName"
+  rm -rf "plugins/$dependentPluginName"
+  mv "$target" "plugins/$dependentPluginName"
+
+  rm -rf "plugins/$dependentPluginName/tests/Integration"
+  rm -rf "plugins/$dependentPluginName/Test/Integration"
+  rm -rf "plugins/$dependentPluginName/tests/Unit"
+  rm -rf "plugins/$dependentPluginName/Test/Unit"
+  rm -rf "plugins/$dependentPluginName/tests/System"
+  rm -rf "plugins/$dependentPluginName/Test/System"
+done
+
+rm -rf "$CLONE_DIR"
+
+echo "Plugin directory:"
+echo ""
+
+ls -d plugins/*
+
+if [ "$FAILED" != "" ]; then
+  echo "::error::Dependent plugins that could not be set up:$FAILED"
+  exit 1
 fi

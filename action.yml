@@ -43,7 +43,7 @@ inputs:
     required: false
     default: ''
   dependent-plugins:
-    description: "Additional plugins to checkout before testing. space separated list of github slugs. e.g. matomo-org/pluginTasksTimetable"
+    description: "Additional plugins to checkout before testing. Space or comma separated list of github slugs, e.g. matomo-org/plugin-TasksTimetable. Each is placed in the folder named in its plugin.json."
     required: false
     default: ''
   github-token:
@@ -109,6 +109,11 @@ runs:
           echo "Attempt $i: Connection failed"
           sleep 2
         done
+        if ! mysql -h127.0.0.1 -uroot -e "SELECT 1" &>/dev/null; then
+          echo "::error::MySQL did not become reachable on 127.0.0.1:3306"
+          docker logs mysql
+          exit 1
+        fi
         mysql -h127.0.0.1 -uroot -e "
           SET GLOBAL sql_mode = 'NO_ENGINE_SUBSTITUTION,STRICT_TRANS_TABLES';
           SET GLOBAL wait_timeout = 36000;
@@ -141,6 +146,11 @@ runs:
           echo "Attempt $i: Connection failed"
           sleep 2
         done
+        if ! mysql -h127.0.0.1 -uroot -e "SELECT 1" &>/dev/null; then
+          echo "::error::MariaDB did not become reachable on 127.0.0.1:3306"
+          docker logs mariadb
+          exit 1
+        fi
 
     - name: start tidb services
       if: inputs.mysql-service == 'true' && inputs.mysql-engine == 'Tidb'
@@ -156,6 +166,11 @@ runs:
           fi
           sleep 1
         done
+        if ! docker exec tidb mysql -h127.0.0.1 -P4000 -uroot -e "SELECT 1" &>/dev/null; then
+          echo "::error::TiDB did not become ready"
+          docker logs tidb
+          exit 1
+        fi
         docker exec tidb mysql -h127.0.0.1 -P4000 -uroot -e "SET GLOBAL sql_mode = 'NO_ENGINE_SUBSTITUTION,STRICT_TRANS_TABLES';SET GLOBAL wait_timeout = 36000;SET GLOBAL max_allowed_packet = 134209536;CREATE DATABASE matomo_tests;"
 
     - name: start valkey serivces
@@ -293,7 +308,7 @@ runs:
         COVERAGE_HTML_REPORT: ${{ inputs.coverage-html-report }}
 
     - name: Debug informations
-      if: ${{ inputs.debug_mode == 'true' }}
+      if: ${{ always() && inputs.debug == 'true' }}
       working-directory: ${{ github.workspace }}/matomo
       shell: bash
       run: |

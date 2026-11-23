@@ -67,11 +67,11 @@ Defines which Mysql adapter Matomo should use to connect to the database. Can be
 
 ### dependent-plugins
 
-Additional plugins to check out before testing. Plugins need to be provided as a comma separated list of their slugs.
+Additional plugins to check out before testing, as a space or comma separated list of their slugs.
 
 E.g. "matomo-org/plugin-CustomVariables" or "matomo-org/plugin-CustomVariables,nickname/PluginName"
 
-Repositories must be named as `PluginName` or `plugin-PluginName` for this to work.
+Each plugin is placed in the folder named by `name` in its `plugin.json`, so the repository can have any name. The job fails when a plugin can not be checked out.
 
 ### github-token
 
@@ -99,7 +99,7 @@ If you want code coverage reports, possible values are none, xdebug, pcov.
 
 ### debug
 
-Output information, like php config, matomo config etc. Defaults to 'false'.
+Set to 'true' to output the PHP configuration, the Matomo configuration and the log files after the tests, also when they fail. Defaults to 'false'.
 
 ### Example usage for a Plugin
 
@@ -141,7 +141,7 @@ jobs:
 | `redis-service` | Whether to set up redis master and sentinel server | - |
 | `mysql-service` | Whether to set up MySQL server (MySQL 8.0 with tmpfs) | - |
 | `mysql-driver` | MySQL adapter for Matomo: `PDO_MYSQL` or `MYSQLI` | `PDO_MYSQL` |
-| `dependent-plugins` | Additional plugins to check out before testing (comma-separated list) | - |
+| `dependent-plugins` | Additional plugins to check out before testing (space or comma separated list) | - |
 | `github-token` | GitHub access token for private repository access | - |
 | `setup-script` | Path to bash script to execute before running tests | - |
 | `ui-test-options` | Additional options for UI tests | - |

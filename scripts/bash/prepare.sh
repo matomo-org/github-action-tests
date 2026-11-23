@@ -5,6 +5,7 @@ GREEN='\033[0;32m'
 SET='\033[0m'
 
 shopt -s extglob
+set -e
 
 echo "::group::Setup test environment"
 
@@ -65,6 +66,10 @@ else
     sed -n '/<filter>/{p;:a;N;/<\/filter>/!ba;s/.*\n/<whitelist addUncoveredFilesFromWhitelist=\"true\">\n<directory suffix=\".php\">..\/..\/plugins\/'$PLUGIN_NAME'<\/directory>\n<exclude>\n<directory suffix=\".php\">..\/..\/plugins\/'$PLUGIN_NAME'\/tests<\/directory>\n<directory suffix=\".php\">..\/..\/plugins\/'$PLUGIN_NAME'\/Test<\/directory>\n<directory suffix=\".php\">..\/..\/plugins\/'$PLUGIN_NAME'\/Updates<\/directory>\n<\/exclude>\n<\/whitelist>\n/};p' ./tests/PHPUnit/phpunit.xml >./tests/PHPUnit/phpunit.xml.new && mv ./tests/PHPUnit/phpunit.xml.new ./tests/PHPUnit/phpunit.xml
   fi
 fi
+
+# The web server and the permissions differ between runner images: a step that fails here shows
+# in the tests that need it.
+set +e
 
 # if just js tests, running php -S otherwise use php fpm
 if [ "$TEST_SUITE" = "JS" ] || [ "$TEST_SUITE" = "Client" ]; then

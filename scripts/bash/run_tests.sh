@@ -81,8 +81,11 @@ if [ -n "$TEST_SUITE" ]; then
     else
       exit 0
     fi
-  fi
   else
-    echo "No known testing suite defined"
-    exit 0
+    echo "::error::Unknown test-type '$TEST_SUITE'. Use PluginTests, UI, JS or Client."
+    exit 1
+  fi
+else
+  echo "::error::No test-type given. Use PluginTests, UI, JS or Client."
+  exit 1
 fi
