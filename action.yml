@@ -72,7 +72,7 @@ inputs:
     default: ''
   service-image-cache:
     type: boolean
-    description: "If true, database and redis images are loaded from the repository's Actions cache when pulling them keeps failing. Runs other than pull requests keep that copy up to date."
+    description: "If true, database and redis images are loaded from the repository's Actions cache when pulling them keeps failing. Push and scheduled runs store a copy of each image there when it has none yet."
     required: false
     default: true
   mysql-timezone:
@@ -133,77 +133,119 @@ runs:
         MYSQL_VERSION: ${{ inputs.mysql-version }}
         REDIS_SERVICE: ${{ inputs.redis-service }}
       run: |
-        images=()
+        database='' redis=''
         if [ "$MYSQL_SERVICE" = true ]; then
           case "$MYSQL_ENGINE" in
-            Mysql) images+=("mirror.gcr.io/library/mysql:${MYSQL_VERSION:-5.7}") ;;
-            Mariadb) images+=("mirror.gcr.io/library/mariadb:${MYSQL_VERSION:-latest}") ;;
-            Tidb) images+=("mirror.gcr.io/pingcap/tidb:${MYSQL_VERSION:-latest}") ;;
+            Mysql) database="mirror.gcr.io/library/mysql:${MYSQL_VERSION:-5.7}" ;;
+            Mariadb) database="mirror.gcr.io/library/mariadb:${MYSQL_VERSION:-latest}" ;;
+            Tidb) database="mirror.gcr.io/pingcap/tidb:${MYSQL_VERSION:-latest}" ;;
           esac
-          [ ${#images[@]} -eq 0 ] || echo "database=${images[0]}" >> "$GITHUB_OUTPUT"
         fi
-        if [ "$REDIS_SERVICE" = true ]; then
-          # Pinned by version tag, not digest: a copy loaded from the cache keeps its tag but loses its digest.
-          images+=(mirror.gcr.io/library/redis:8.6.3)
-          echo "redis=mirror.gcr.io/library/redis:8.6.3" >> "$GITHUB_OUTPUT"
-        fi
-        [ ${#images[@]} -gt 0 ] || exit 0
-        echo "images=${images[*]}" >> "$GITHUB_OUTPUT"
-        echo "key=matomo-service-images-$(echo "${images[*]}" | sha256sum | cut -c1-16)" >> "$GITHUB_OUTPUT"
-        for image in "${images[@]}"; do
-          for attempt in 1 2 3; do
-            if docker pull -q "$image"; then
-              continue 2
-            fi
-            [ "$attempt" = 3 ] || sleep $((attempt * 10))
-          done
-          echo "::warning::Could not pull $image"
-          echo "failed=true" >> "$GITHUB_OUTPUT"
-          exit 0
+        # Pinned by version tag, not digest: a copy loaded from the cache keeps its tag but loses its digest.
+        [ "$REDIS_SERVICE" != true ] || redis=mirror.gcr.io/library/redis:8.6.3
+        failed=false
+        for service in database redis; do
+          image=${!service}
+          [ -n "$image" ] || continue
+          name=${image#mirror.gcr.io/}
+          echo "$service=$image" >> "$GITHUB_OUTPUT"
+          # One cache entry per image, so jobs and branches share copies.
+          echo "$service-key=matomo-service-image-${name//[^a-zA-Z0-9.]/-}" >> "$GITHUB_OUTPUT"
+          if [ "$failed" = false ]; then
+            for attempt in 1 2 3; do
+              docker pull -q "$image" && continue 2
+              [ "$attempt" = 3 ] || sleep $((attempt * 10))
+            done
+            echo "::warning::Could not pull $image"
+            failed=true
+          fi
+          echo "$service-missing=true" >> "$GITHUB_OUTPUT"
         done
 
-    - name: Restore service images from the Actions cache
-      id: service-images-restore
-      if: steps.service-images.outputs.failed == 'true' && inputs.service-image-cache == 'true'
+    - name: Restore the database image from the Actions cache
+      id: database-image-restore
+      if: steps.service-images.outputs.database-missing == 'true' && inputs.service-image-cache == 'true'
       uses: actions/cache/restore@v6
       with:
-        path: ${{ runner.temp }}/matomo-service-images
-        key: ${{ steps.service-images.outputs.key }}
+        path: ${{ runner.temp }}/matomo-service-images/database
+        key: ${{ steps.service-images.outputs.database-key }}
+
+    - name: Restore the redis image from the Actions cache
+      id: redis-image-restore
+      if: steps.service-images.outputs.redis-missing == 'true' && inputs.service-image-cache == 'true'
+      uses: actions/cache/restore@v6
+      with:
+        path: ${{ runner.temp }}/matomo-service-images/redis
+        key: ${{ steps.service-images.outputs.redis-key }}
 
     - name: Load service images
-      if: steps.service-images-restore.outputs.cache-hit == 'true'
-      shell: bash
-      run: docker load -i "$RUNNER_TEMP/matomo-service-images/images.tar"
-
-    - name: Check the Actions cache for the service images
-      id: service-images-cached
-      # Keeping the copy up to date must never fail a job, so the steps below continue on errors.
+      # A broken copy must not fail the job here, starting the service then tries to pull once more.
       continue-on-error: true
-      if: steps.service-images.outputs.key != '' && steps.service-images.outputs.failed != 'true' && inputs.service-image-cache == 'true' && github.event_name != 'pull_request'
+      if: steps.database-image-restore.outputs.cache-hit == 'true' || steps.redis-image-restore.outputs.cache-hit == 'true'
+      shell: bash
+      run: |
+        for archive in "$RUNNER_TEMP"/matomo-service-images/*/image.tar; do
+          docker load -i "$archive"
+        done
+
+    # Push and scheduled runs store a copy of each pulled image the cache does not have yet.
+    # Storing must never fail a job, so these steps continue on errors.
+    - name: Check the Actions cache for the database image
+      id: database-image-cached
+      continue-on-error: true
+      if: steps.service-images.outputs.database != '' && steps.service-images.outputs.database-missing != 'true' && inputs.service-image-cache == 'true' && (github.event_name == 'push' || github.event_name == 'schedule')
       uses: actions/cache/restore@v6
       with:
-        path: ${{ runner.temp }}/matomo-service-images
-        key: ${{ steps.service-images.outputs.key }}
+        path: ${{ runner.temp }}/matomo-service-images/database
+        key: ${{ steps.service-images.outputs.database-key }}
+        lookup-only: true
+
+    - name: Check the Actions cache for the redis image
+      id: redis-image-cached
+      continue-on-error: true
+      if: steps.service-images.outputs.redis != '' && steps.service-images.outputs.redis-missing != 'true' && inputs.service-image-cache == 'true' && (github.event_name == 'push' || github.event_name == 'schedule')
+      uses: actions/cache/restore@v6
+      with:
+        path: ${{ runner.temp }}/matomo-service-images/redis
+        key: ${{ steps.service-images.outputs.redis-key }}
         lookup-only: true
 
     - name: Save service images
       id: service-images-save
       continue-on-error: true
-      if: steps.service-images-cached.outcome == 'success' && steps.service-images-cached.outputs.cache-hit != 'true'
+      if: (steps.database-image-cached.outcome == 'success' && steps.database-image-cached.outputs.cache-hit != 'true') || (steps.redis-image-cached.outcome == 'success' && steps.redis-image-cached.outputs.cache-hit != 'true')
       shell: bash
       env:
-        IMAGES: ${{ steps.service-images.outputs.images }}
+        DATABASE: ${{ steps.database-image-cached.outcome == 'success' && steps.database-image-cached.outputs.cache-hit != 'true' && steps.service-images.outputs.database || '' }}
+        REDIS: ${{ steps.redis-image-cached.outcome == 'success' && steps.redis-image-cached.outputs.cache-hit != 'true' && steps.service-images.outputs.redis || '' }}
       run: |
-        mkdir -p "$RUNNER_TEMP/matomo-service-images"
-        docker save -o "$RUNNER_TEMP/matomo-service-images/images.tar" $IMAGES
+        for service in DATABASE REDIS; do
+          [ -n "${!service}" ] || continue
+          mkdir -p "$RUNNER_TEMP/matomo-service-images/${service,,}"
+          docker save -o "$RUNNER_TEMP/matomo-service-images/${service,,}/image.tar" "${!service}"
+        done
 
-    - name: Store service images in the Actions cache
+    - name: Store the database image in the Actions cache
       continue-on-error: true
-      if: steps.service-images-save.outcome == 'success'
+      if: steps.service-images-save.outcome == 'success' && steps.database-image-cached.outcome == 'success' && steps.database-image-cached.outputs.cache-hit != 'true'
       uses: actions/cache/save@v6
       with:
-        path: ${{ runner.temp }}/matomo-service-images
-        key: ${{ steps.service-images.outputs.key }}
+        path: ${{ runner.temp }}/matomo-service-images/database
+        key: ${{ steps.service-images.outputs.database-key }}
+
+    - name: Store the redis image in the Actions cache
+      continue-on-error: true
+      if: steps.service-images-save.outcome == 'success' && steps.redis-image-cached.outcome == 'success' && steps.redis-image-cached.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v6
+      with:
+        path: ${{ runner.temp }}/matomo-service-images/redis
+        key: ${{ steps.service-images.outputs.redis-key }}
+
+    - name: Remove the service image archives
+      # Docker holds the images now, so the archives only take disk space.
+      if: steps.service-images.outputs.database-key != '' || steps.service-images.outputs.redis-key != ''
+      shell: bash
+      run: rm -rf "$RUNNER_TEMP/matomo-service-images"
 
     - name: start mysql services
       if: inputs.mysql-service == 'true' && inputs.mysql-engine == 'Mysql'
