@@ -73,6 +73,11 @@ This action is able to run certain test suites for Matomo or any Matomo plugin.
     Defines if a MySQL server should be set up before testing. If so a MySQL 5.7 server using tmpfs will be set up.
 
 
+  * **service-image-cache**
+
+    The database and redis images are pulled with up to 3 attempts. With this input set to `true` (default), the action loads them from the repository's Actions cache when pulling keeps failing. Push and scheduled runs store one copy per image there when it has none yet, which pull requests then read from their base branch or the default branch. A stored copy is not refreshed, so for a moving tag like `mariadb:10.6` it can be older than the latest release. Set it to `false` to skip the cache.
+
+
   * **mysql-driver**
 
     Defines which Mysql adapter Matomo should use to connect to the database. Can be set to `PDO_MYSQL` (default) or `MYSQLI`.
