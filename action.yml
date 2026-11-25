@@ -135,10 +135,11 @@ runs:
       run: |
         database='' redis=''
         if [ "$MYSQL_SERVICE" = true ]; then
-          case "$MYSQL_ENGINE" in
-            Mysql) database="mirror.gcr.io/library/mysql:${MYSQL_VERSION:-5.7}" ;;
-            Mariadb) database="mirror.gcr.io/library/mariadb:${MYSQL_VERSION:-latest}" ;;
-            Tidb) database="mirror.gcr.io/pingcap/tidb:${MYSQL_VERSION:-latest}" ;;
+          # Case-insensitive like the expressions that pick the start step.
+          case "${MYSQL_ENGINE,,}" in
+            mysql) database="mirror.gcr.io/library/mysql:${MYSQL_VERSION:-5.7}" ;;
+            mariadb) database="mirror.gcr.io/library/mariadb:${MYSQL_VERSION:-latest}" ;;
+            tidb) database="mirror.gcr.io/pingcap/tidb:${MYSQL_VERSION:-latest}" ;;
           esac
         fi
         # Pinned by version tag, not digest: a copy loaded from the cache keeps its tag but loses its digest.
